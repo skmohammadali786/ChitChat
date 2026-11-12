@@ -9,7 +9,7 @@ mod message;
 mod profile;
 mod result;
 
-pub use message::{EncryptedEnvelope, MessageKind, validate_envelope};
+pub use message::{\n    EncryptedEnvelope, MediaKind, MessageBlock, MessageContent, MessageKind,\n    validate_envelope, validate_message_content,\n};
 pub use profile::{ProfileDraft, validate_profile};
 pub use result::{CoreError, CoreResult};
 
