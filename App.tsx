@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
+  ActivityIndicator, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
 import { Avatar } from "./src/components/Avatar";
@@ -8,6 +8,7 @@ import { SecretReveal } from "./src/components/SecretReveal";
 import { palette, radius, spacing, typeScale } from "./src/theme/tokens";
 import type { Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./src/features/auth/AuthScreen";
+import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
@@ -287,19 +288,28 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [demoMode, setDemoMode] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
 
     let mounted = true;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (mounted) {
+        if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
         setSession(nextSession);
         if (!nextSession) {
           setProfile(null);
           setProfileError("");
+          setPasswordRecovery(false);
         }
       }
+    });
+
+    supabase.auth.startAutoRefresh();
+    const appStateSubscription = AppState.addEventListener("change", state => {
+      if (state === "active") supabase.auth.startAutoRefresh();
+      else supabase.auth.stopAutoRefresh();
     });
 
     const linkSubscription = Linking.addEventListener("url", ({ url }) => {
@@ -321,6 +331,8 @@ export default function App() {
       mounted = false;
       subscription.unsubscribe();
       linkSubscription.remove();
+      appStateSubscription.remove();
+      supabase.auth.stopAutoRefresh();
     };
   }, []);
 
@@ -358,12 +370,16 @@ export default function App() {
     if (supabase) await supabase.auth.signOut();
     setDemoMode(false);
     setProfile(null);
+    setPasswordRecovery(false);
     setSession(null);
   }
 
   if (!isSupabaseConfigured) return <MainApp profile={null} />;
   if (demoMode) return <MainApp profile={null} onExitDemo={() => setDemoMode(false)} />;
   if (!authReady || profileLoading) return <AppBootScreen />;
+  if (passwordRecovery && session?.user) {
+    return <PasswordRecoveryScreen onDone={() => { void signOut(); }} />;
+  }
   if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
