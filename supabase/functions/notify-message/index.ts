@@ -51,15 +51,27 @@ Deno.serve(
       const recipientIds = [...new Set((members ?? []).map(row => row.user_id))];
       if (recipientIds.length === 0) return json({ sent: 0, reason: "no_recipients" });
 
-      const [{ data: settings, error: settingsError }, { data: devices, error: devicesError }] = await Promise.all([
+      const [
+        { data: settings, error: settingsError },
+        { data: devices, error: devicesError },
+        { data: conversationSettings, error: conversationSettingsError },
+      ] = await Promise.all([
         admin.from("user_settings").select("user_id,notification_preview").in("user_id", recipientIds),
         admin.from("push_devices").select("id,user_id,expo_push_token").in("user_id", recipientIds).is("revoked_at", null),
+        admin.from("conversation_user_settings").select("user_id,muted_until")
+          .eq("conversation_id", message.conversation_id).in("user_id", recipientIds),
       ]);
       if (settingsError) throw settingsError;
       if (devicesError) throw devicesError;
+      if (conversationSettingsError) throw conversationSettingsError;
 
       const previewByUser = new Map((settings ?? []).map(row => [row.user_id, row.notification_preview]));
-      const allowedRecipients = new Set(recipientIds.filter(id => previewByUser.get(id) !== "none"));
+      const muteByUser = new Map((conversationSettings ?? []).map(row => [row.user_id, row.muted_until]));
+      const allowedRecipients = new Set(recipientIds.filter(id => {
+        const mutedUntil = muteByUser.get(id);
+        const isMuted = typeof mutedUntil === "string" && new Date(mutedUntil).getTime() > Date.now();
+        return previewByUser.get(id) !== "none" && !isMuted;
+      }));
       const { data: senderProfile, error: senderProfileError } = await admin
         .from("profiles")
         .select("display_name,username")
