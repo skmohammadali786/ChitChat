@@ -34,7 +34,7 @@ export function subscribeToMessageReceipts(
   onReceipt: (receipt: MessageReceipt) => void,
 ) {
   const channel = client()
-    .channel(`message-receipts:${conversationId}`)
+    .channel(`conversation:${conversationId}`, { config: { private: true } })
     .on("postgres_changes", {
       event: "*",
       schema: "public",
