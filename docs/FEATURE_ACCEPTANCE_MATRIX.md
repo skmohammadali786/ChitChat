@@ -28,13 +28,13 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Group create, add/remove members, roles, invite links, membership changes and key rotation |
+| Groups | PARTIAL | Supabase create/list/add/remove/rename/transfer-owner RPCs are installed; group UI, invitations, role management and E2EE key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | NOT STARTED | Respect sender policy and platform limitations |
-| Reactions | PARTIAL | Unicode emoji persistence and realtime updates; E2EE/privacy policy still required |
+| Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
 | Search | NOT STARTED | Local encrypted search index, no server-side plaintext indexing |
 | Pin, mute, archive, delete | NOT STARTED | Per-user conversation state and deletion semantics |
-| Typing and presence | NOT STARTED | Realtime ephemeral state with privacy toggles |
+| Typing and presence | PARTIAL | Private membership-authorized Realtime channels and online/typing/last-seen privacy policies exist; chat UI integration remains |
 
 ## Secret content
 
@@ -67,10 +67,10 @@ Legend:
 | Feature | Status | Acceptance requirement |
 |---|---|---|
 | Offline outbox | NOT STARTED | Encrypted local queue, retry, idempotency and conflict handling |
-| Pending/sent/delivered/failed states | NOT STARTED | Per-recipient receipt records and accurate UI |
-| Read receipts | NOT STARTED | Per-user privacy setting and message receipt state |
-| Push notifications | NOT STARTED | Expo push token registration, private payloads and delivery retries |
-| Scheduled messages | NOT STARTED | Encrypted scheduled payloads and server-side scheduler |
+| Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
+| Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
+| Push notifications | PARTIAL | Expo token registration table and client service exist; Edge Function delivery, token validation and retries remain |
+| Scheduled messages | PARTIAL | Encrypted envelope table, client scheduling service and pg_cron dispatcher are installed; UI and delivery tests remain |
 | Disappearing messages | NOT STARTED | Expiry policy, server cleanup and local cache handling |
 
 ## Privacy, safety and account controls
@@ -79,10 +79,10 @@ Legend:
 |---|---|---|
 | Block/unblock | PARTIAL | Existing DB and client functions; complete UI and mutual enforcement |
 | Report message/user | PARTIAL | Private report table exists; reporting UI, abuse triage and rate limits |
-| App lock | NOT STARTED | Passcode/biometric gate and secure lifecycle handling |
+| App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
 | Notification privacy | NOT STARTED | Hide content and secret-message previews |
-| Last seen/read receipts privacy | NOT STARTED | Synced settings and server enforcement |
+| Last seen/read receipts privacy | PARTIAL | Synced setting fields and read-receipt enforcement exist; full UI and presence wiring remain |
 | Contact permissions | NOT STARTED | Optional OS permission and privacy-safe discovery |
 | Spam and abuse controls | PARTIAL | Username lookup throttling exists; message, media and invite controls remain |
 
@@ -90,8 +90,8 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| External secret links | NOT STARTED | High-entropy token, hash at rest, encrypted payload, expiry, revocation, rate limits and web reveal page |
-| Optional subscriptions | NOT STARTED | StoreKit/Google Play billing, entitlements and restore purchases |
+| External secret links | PARTIAL | Private token-hash and encrypted-payload table exists; create/redeem/revoke endpoints, expiry enforcement and web reveal page remain |
+| Optional subscriptions | PARTIAL | User-scoped entitlement table exists; Apple/Google purchase validation, UI and restore purchases remain |
 | Free core privacy/security | NOT STARTED | Encryption, basic messaging and safety never paywalled |
 | Storage/customization tiers | NOT STARTED | Server-enforced quota and subscription entitlements |
 
@@ -100,7 +100,7 @@ Legend:
 | Feature | Status | Acceptance requirement |
 |---|---|---|
 | Light/dark/system themes | PARTIAL | Persisted settings and all screens |
-| Accent palette selection | PARTIAL | Token-driven palette picker |
+| Accent palette selection | PARTIAL | Synced accent token exists; palette picker and all-screen UI wiring remain |
 | Design system | PARTIAL | Astryx-informed conventions, reusable components and state coverage |
 | Reduced motion | PARTIAL | All reveal and navigation animation respects OS setting |
 | Accessibility | NOT STARTED | TalkBack, VoiceOver, focus order, labels, contrast and touch targets |
