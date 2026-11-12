@@ -316,15 +316,14 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   update public.conversations
      set updated_at = now()
    where id = new.conversation_id;
   return new;
 end;
-$;
-
+$$;
 revoke all on function public.touch_conversation_after_message() from public, anon, authenticated;
 
 drop trigger if exists messages_touch_conversation on public.messages;
