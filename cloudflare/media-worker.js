@@ -9,7 +9,7 @@ function response(body, status, request) {
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
     "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256",
-    "access-control-expose-headers": "etag, x-content-sha256",
+    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version",
     "vary": "Origin",
   });
   return new Response(JSON.stringify(body), { status, headers });
