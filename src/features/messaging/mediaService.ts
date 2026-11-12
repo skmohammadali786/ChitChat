@@ -58,7 +58,7 @@ export async function uploadEncryptedMedia(
   if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_MEDIA_BYTES) {
     throw new Error("Encrypted media must be between 1 byte and 50 MB.");
   }
-  if (!/^[a-f0-9]{64}$/.test(payload.sha256) || payload.cryptoVersion < 1) {
+  if (!/^[a-f0-9]{64}$/.test(payload.sha256) || !Number.isInteger(payload.cryptoVersion) || payload.cryptoVersion < 1) {
     throw new Error("The Rust media encryption metadata is invalid.");
   }
 
