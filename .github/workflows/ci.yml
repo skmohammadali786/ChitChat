@@ -1,0 +1,31 @@
+name: ChitChat checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.x
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check Expo package compatibility
+        run: npx expo install --check
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - name: Expo project diagnostics
+        run: npx expo-doctor
