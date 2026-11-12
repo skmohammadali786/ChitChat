@@ -22,7 +22,8 @@ Without Supabase credentials, the app opens in local demo mode. Demo messages ar
 - Light and dark appearance and recipient auto-reveal preference.
 - Supabase email/password sign-up, sign-in, email confirmation callback, and password recovery.
 - Encrypted mobile session persistence using Expo SecureStore.
-- Profile onboarding with username, display name, bio, and username-discovery preference.
+- Profile onboarding and editing with username, display name, bio, and username-discovery preference.
+- Account blocking and unblock management, enforced in username discovery and direct-message send policies.
 - Exact username lookup, with a server-side per-user rate limit.
 - Direct conversation creation and conversation list APIs.
 - Conversation and ciphertext-only message table schema with membership-based RLS.
@@ -42,3 +43,4 @@ See [security decisions](docs/SECURITY_DECISIONS.md) for protocol evaluation and
 - [Product blueprint](docs/PRODUCT_BLUEPRINT.md)
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Android build guide](docs/ANDROID_BUILDS.md)
