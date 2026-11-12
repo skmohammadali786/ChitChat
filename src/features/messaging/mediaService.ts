@@ -97,6 +97,7 @@ export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Pro
       authorization: `Bearer ${token}`,
       "content-type": "application/octet-stream",
       "x-content-sha256": payload.sha256,
+      "x-chitchat-crypto-version": String(payload.cryptoVersion),
     },
     body: payload.bytes,
   });
