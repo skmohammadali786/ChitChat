@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
@@ -66,6 +66,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState("");
+  const pushSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
     text: palette.darkText, muted: palette.darkMuted, line: palette.darkLine
@@ -176,6 +177,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       if (enabled) {
         try {
           tokenSubscription = listenForPushTokenChanges();
+          pushSubscriptionRef.current = tokenSubscription;
         } catch (error) {
           setPushError(error instanceof Error ? error.message : "Could not watch push token changes.");
         }
@@ -186,6 +188,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     return () => {
       active = false;
       tokenSubscription?.remove();
+      pushSubscriptionRef.current = null;
     };
   }, [profile?.id]);
 
@@ -195,14 +198,14 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     try {
       if (pushEnabled) {
         await disablePushNotifications();
+        pushSubscriptionRef.current?.remove();
+        pushSubscriptionRef.current = null;
         setPushEnabled(false);
       } else {
         await enablePushNotifications();
+        pushSubscriptionRef.current?.remove();
+        pushSubscriptionRef.current = listenForPushTokenChanges();
         setPushEnabled(true);
-        try {
-          // Keep the Expo token registered if the provider rotates it later.
-          // A listener is installed by the account-scoped effect on next render.
-        } catch {}
       }
     } catch (error) {
       setPushError(error instanceof Error ? error.message : "Could not update notification settings.");
