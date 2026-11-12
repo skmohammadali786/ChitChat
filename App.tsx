@@ -1,11 +1,16 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
+  ActivityIndicator, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
 import { Avatar } from "./src/components/Avatar";
 import { SecretReveal } from "./src/components/SecretReveal";
 import { palette, radius, spacing, typeScale } from "./src/theme/tokens";
+import type { Session } from "@supabase/supabase-js";
+import { AuthScreen } from "./src/features/auth/AuthScreen";
+import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
+import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
+import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 
 type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
@@ -25,7 +30,7 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-export default function App() {
+function MainApp({ profile, onSignOut }: { profile?: ChitChatProfile | null; onSignOut?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [search, setSearch] = useState("");
@@ -140,6 +145,25 @@ export default function App() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
+          {profile ? (
+            <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.xl }]}>
+              <Avatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>{profile.display_name}</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>@{profile.username}</Text>
+              </View>
+              {onSignOut ? (
+                <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 8 }}>
+                  <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign out</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <View style={[styles.infoCard, { backgroundColor: dark ? "#202B35" : "#EAF6EF", marginBottom: spacing.xl }]}>
+              <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontWeight: "800", fontSize: 13 }}>Demo mode</Text>
+              <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 12, lineHeight: 18, marginTop: 5 }}>These conversations use local sample data. Connect a ChitChat Supabase project to enable accounts and cloud sync.</Text>
+            </View>
+          )}
           <Text style={[styles.sectionTitle, { color: c.text, marginBottom: spacing.lg }]}>Your experience</Text>
           <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Dark appearance</Text><Text style={[styles.settingHint, { color: c.muted }]}>Use a darker color palette</Text></View>
@@ -224,3 +248,118 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 44, borderRadius: radius.pill, paddingHorizontal: 16, fontSize: 14 },
   sendButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" }
 });
+
+
+function AppBootScreen() {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.paper, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 52, height: 52, borderRadius: 18, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "#FFFFFF", fontSize: 32, fontWeight: "900", marginTop: -3 }}>c.</Text>
+      </View>
+      <ActivityIndicator color={palette.brand} style={{ marginTop: 22 }} />
+      <Text style={{ color: palette.muted, marginTop: 10, fontSize: 12 }}>Preparing your private space</Text>
+    </SafeAreaView>
+  );
+}
+
+function AuthProblemScreen({ message, onSignOut }: { message: string; onSignOut: () => void }) {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.paper, justifyContent: "center", padding: 24 }}>
+      <Text style={{ color: palette.ink, fontSize: 23, fontWeight: "800" }}>Account setup needs attention</Text>
+      <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 20, marginTop: 10 }}>{message}</Text>
+      <Text style={{ color: palette.inkSoft, fontSize: 12, lineHeight: 19, marginTop: 14 }}>Check docs/SUPABASE_SETUP.md in the ChitChat repository. The database schema must be installed and the profiles table exposed through the Supabase Data API.</Text>
+      <Pressable accessibilityRole="button" onPress={onSignOut} style={{ backgroundColor: palette.brand, minHeight: 48, borderRadius: radius.md, alignItems: "center", justifyContent: "center", marginTop: 24 }}>
+        <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>Sign out</Text>
+      </Pressable>
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
+  const [profile, setProfile] = useState<ChitChatProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    let mounted = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (mounted) {
+        setSession(nextSession);
+        if (!nextSession) {
+          setProfile(null);
+          setProfileError("");
+        }
+      }
+    });
+
+    const linkSubscription = Linking.addEventListener("url", ({ url }) => {
+      void completeAuthFromUrl(url);
+    });
+
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) console.warn("ChitChat could not restore the auth session.", error);
+      setSession(data.session);
+      setAuthReady(true);
+    });
+
+    void Linking.getInitialURL().then(url => {
+      if (url) return completeAuthFromUrl(url);
+    }).catch(error => console.warn("ChitChat could not read the initial auth URL.", error));
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      linkSubscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !session?.user) {
+      setProfile(null);
+      setProfileError("");
+      setProfileLoading(false);
+      return;
+    }
+
+    let active = true;
+    setProfileLoading(true);
+    setProfileError("");
+    void supabase
+      .from("profiles")
+      .select("id, username, display_name, bio, avatar_url")
+      .eq("id", session.user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setProfileError(error.message);
+          setProfile(null);
+        } else {
+          setProfile(data as ChitChatProfile | null);
+        }
+        setProfileLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [session?.user.id]);
+
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut();
+    setDemoMode(false);
+    setProfile(null);
+    setSession(null);
+  }
+
+  if (!isSupabaseConfigured || demoMode) return <MainApp profile={null} />;
+  if (!authReady || profileLoading) return <AppBootScreen />;
+  if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
+  if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
+  if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
+  return <MainApp profile={profile} onSignOut={() => { void signOut(); }} />;
+}
