@@ -29,8 +29,8 @@ export function SecretReveal({ text, autoReveal = false, onReveal, onHide }: Pro
   }, []);
 
   useEffect(() => {
-    if (autoReveal && !revealed) reveal();
-  }, [autoReveal, revealed]);
+    if (autoReveal) reveal();
+  }, [autoReveal]);
 
   function reveal() {
     setRevealed(true);
