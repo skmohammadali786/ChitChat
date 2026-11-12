@@ -24,8 +24,37 @@ alter table public.profiles
 create unique index if not exists profiles_username_lower_unique
   on public.profiles (lower(username));
 
--- Store discovery rate-limit events in a schema that is not exposed through
--- Supabase's public Data API.
+alter table public.profiles enable row level security;
+
+-- Profile records are private. Username discovery is handled by a narrow
+-- authenticated RPC below, not by granting broad table SELECT access.
+revoke all on table public.profiles from anon, public;
+grant usage on schema public to authenticated;
+grant select, insert, update on table public.profiles to authenticated;
+
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+  on public.profiles
+  for select
+  to authenticated
+  using ((select auth.uid()) = id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+  on public.profiles
+  for insert
+  to authenticated
+  with check ((select auth.uid()) = id);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+  on public.profiles
+  for update
+  to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
+
+-- A non-exposed schema stores only discovery rate-limit events.
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
 
@@ -50,7 +79,7 @@ returns table (
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_requester_id uuid := auth.uid();
   v_normalized_username text := lower(trim(search_username));
@@ -63,36 +92,7 @@ begin
   if v_normalized_username is null
      or char_length(v_normalized_username) < 3
      or char_length(v_normalized_username) > 20
-     or v_normalized_username !~ '^[a-z0-9_]+
-
-alter table public.profiles enable row level security;
-
--- Do not expose profile rows to anonymous clients.
-revoke all on table public.profiles from anon, public;
-grant select, insert, update on table public.profiles to authenticated;
-
-drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own"
-  on public.profiles
-  for select
-  to authenticated
-  using ((select auth.uid()) = id);
-
-drop policy if exists "profiles_insert_own" on public.profiles;
-create policy "profiles_insert_own"
-  on public.profiles
-  for insert
-  to authenticated
-  with check ((select auth.uid()) = id);
-
-drop policy if exists "profiles_update_own" on public.profiles;
-create policy "profiles_update_own"
-  on public.profiles
-  for update
-  to authenticated
-  using ((select auth.uid()) = id)
-  with check ((select auth.uid()) = id);
- then
+     or v_normalized_username !~ '^[a-z0-9_]{3,20}$' then
     return;
   end if;
 
@@ -100,9 +100,9 @@ create policy "profiles_update_own"
     pg_catalog.hashtextextended(v_requester_id::text, 1)
   );
 
-  delete from private.profile_search_events
-   where profile_search_events.requester_id = v_requester_id
-     and profile_search_events.searched_at < now() - interval '1 minute';
+  delete from private.profile_search_events as search_event
+   where search_event.requester_id = v_requester_id
+     and search_event.searched_at < now() - interval '1 minute';
 
   select pg_catalog.count(*)::integer
     into v_recent_searches
@@ -125,35 +125,7 @@ create policy "profiles_update_own"
       and profile_row.id <> v_requester_id
     limit 1;
 end;
-$;
+$$;
 
 revoke all on function public.lookup_profile_by_username(text) from public, anon;
 grant execute on function public.lookup_profile_by_username(text) to authenticated;
-
-alter table public.profiles enable row level security;
-
--- Do not expose profile rows to anonymous clients.
-revoke all on table public.profiles from anon, public;
-grant select, insert, update on table public.profiles to authenticated;
-
-drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own"
-  on public.profiles
-  for select
-  to authenticated
-  using ((select auth.uid()) = id);
-
-drop policy if exists "profiles_insert_own" on public.profiles;
-create policy "profiles_insert_own"
-  on public.profiles
-  for insert
-  to authenticated
-  with check ((select auth.uid()) = id);
-
-drop policy if exists "profiles_update_own" on public.profiles;
-create policy "profiles_update_own"
-  on public.profiles
-  for update
-  to authenticated
-  using ((select auth.uid()) = id)
-  with check ((select auth.uid()) = id);
