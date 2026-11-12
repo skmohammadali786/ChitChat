@@ -38,6 +38,7 @@ PR #1 remains draft. Do not merge.
 - External secret-link endpoints/reveal page and subscription purchase/restore flows are not implemented.
 - System theme, accent palette picker, complete reduced-motion behavior and systematic accessibility tests are incomplete.
 - No committed `package-lock.json` exists. Current CI uses `npm install`, so dependency resolution is not reproducible.
+- The live Supabase project records five initial migrations (`20261112180603` through `20261112182101`) whose SQL files are absent from this branch. The setup scripts contain the bootstrap schema, but the migration history is not yet self-contained. A clean database requires running the setup scripts before the tracked migrations until those original baseline migrations are reconstructed.
 - Latest recorded GitHub Actions run failed before any job steps were reported. TypeScript, Expo Doctor, Rust tests, rustfmt and Clippy have not been verified.
 - No Android or iOS development/release build has been tested on a device. No Android↔iOS exchange has passed.
 
