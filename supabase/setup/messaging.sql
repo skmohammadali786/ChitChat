@@ -1,5 +1,8 @@
 -- ChitChat messaging and identity schema.
 -- Apply after supabase/setup/profiles.sql. Mirrors the deployed project schema.
+-- The private schema stays outside the Data API exposed schema list. This grant
+-- lets invoker wrappers call the security-definer implementations inside it.
+grant usage on schema private to authenticated;
 
 create table if not exists public.user_blocks (
  blocker_id uuid not null references auth.users(id) on delete cascade,
