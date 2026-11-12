@@ -128,8 +128,8 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           {subtitle ? <Text style={[styles.subtitle, { color: c.muted }]}>{subtitle}</Text> : null}
         </View>
       </View>
-      {!back ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction ?? (() => setSearch(""))}>
+      {!back && newAction ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction}>
           <Text style={styles.newButtonText}>＋</Text>
         </Pressable>
       ) : null}
@@ -218,7 +218,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
-      <Header title="ChitChat" subtitle="A little more personal." newAction={() => setShowNewChat(true)} />
+      <Header title="ChitChat" subtitle="A little more personal." newAction={isSupabaseConfigured ? () => setShowNewChat(true) : undefined} />
       {tab === "Chats" ? (
         <>
           <View style={[styles.searchBox, { backgroundColor: c.surface }]}>
