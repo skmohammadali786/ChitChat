@@ -6,6 +6,7 @@ import {
 import type { ChitChatProfile } from "../../lib/supabase";
 import { supabase } from "../../lib/supabase";
 import { palette, radius, spacing, typeScale } from "../../theme/tokens";
+import { chitchatCore } from "../../native/chitchatCore";
 
 type Props = {
   profile: ChitChatProfile;
@@ -45,6 +46,9 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
 
     setBusy(true);
     try {
+      if (chitchatCore.available) {
+        await chitchatCore.validateProfile({ username: cleanUsername, display_name: cleanDisplayName, bio: cleanBio, discoverable: profile.discoverable });
+      }
       const { data, error: updateError } = await supabase
         .from("profiles")
         .update({
