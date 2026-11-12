@@ -72,7 +72,11 @@ class SecureSessionStorage implements SessionStorage {
     const manifestKey = `${base}.manifest`;
     const previous = await this.readManifest(key);
     const prefix = `${base}.${Date.now()}.${Math.random().toString(36).slice(2, 9)}`;
-    const chunks = value.match(new RegExp(`[\\s\\S]{1,${this.chunkSize}}`, "g")) ?? [""];
+    const chunks: string[] = [];
+    for (let offset = 0; offset < value.length; offset += this.chunkSize) {
+      chunks.push(value.slice(offset, offset + this.chunkSize));
+    }
+    if (chunks.length === 0) chunks.push("");
 
     try {
       await Promise.all(
