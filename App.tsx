@@ -535,7 +535,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <Header
           title={activeChat.name}
-          subtitle={typingUserId ? "typing…" : activeChat.isGroup ? "group conversation" : activeChat.online ? "online now" : showLastSeen ? "last seen recently" : "status hidden"}
+          subtitle={typingUserId ? "typing…" : activeChat.isGroup ? "group conversation" : activeChat.online ? "online now" : showLastSeen ? "offline" : "status hidden"}
           back={() => setActiveChat(null)}
           action={activeChat.isGroup ? {
             label: "Members",
