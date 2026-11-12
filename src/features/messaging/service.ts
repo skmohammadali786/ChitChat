@@ -54,6 +54,51 @@ function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
 
 
 
+
+export type BlockedProfile = {
+  blocked_user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  blocked_at: string;
+};
+
+export async function blockUser(targetUserId: string): Promise<void> {
+  if (!targetUserId) throw new Error("Choose a valid account to block.");
+  const client = requireClient();
+  const { data: { user }, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("Sign in before blocking an account.");
+  if (user.id === targetUserId) throw new Error("You cannot block your own account.");
+
+  const { error } = await client.from("user_blocks").insert({
+    blocker_id: user.id,
+    blocked_user_id: targetUserId,
+  });
+  if (error && error.code !== "23505") throw error;
+}
+
+export async function unblockUser(targetUserId: string): Promise<void> {
+  const client = requireClient();
+  const { data: { user }, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("Sign in before changing your block list.");
+
+  const { error } = await client
+    .from("user_blocks")
+    .delete()
+    .eq("blocker_id", user.id)
+    .eq("blocked_user_id", targetUserId);
+  if (error) throw error;
+}
+
+export async function loadBlockedUsers(): Promise<BlockedProfile[]> {
+  const client = requireClient();
+  const { data, error } = await client.rpc("list_my_blocks");
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as BlockedProfile[];
+}
+
 export type ConversationSummary = {
   conversation_id: string;
   conversation_kind: "direct" | "group";
