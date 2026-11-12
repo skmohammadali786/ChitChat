@@ -20,10 +20,10 @@ import { subscribeToConversationPresence } from "./src/features/messaging/presen
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference } from "./src/lib/preferences";
-import { loadUserSettings, saveUserSettings } from "./src/features/settings/userSettings";
+import { loadConversationSettings, loadUserSettings, saveConversationSettings, saveUserSettings, type ConversationSettings } from "./src/features/settings/userSettings";
 import { disablePushNotifications, enablePushNotifications, listenForPushTokenChanges, revokeCurrentPushRegistration, syncPushRegistrationIfGranted } from "./src/features/notifications/registration";
 
-type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string };
+type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string; pinnedAt?: string | null; mutedUntil?: string | null; archivedAt?: string | null; hiddenAt?: string | null };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
 
 const initialChats: Chat[] = [
@@ -152,7 +152,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     }
   }
 
-  const filteredChats = useMemo(() => chats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+  const filteredChats = useMemo(() => chats
+    .filter(chat => !chat.archivedAt && !chat.hiddenAt && chat.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((left, right) => {
+      const leftPinned = left.pinnedAt ? Date.parse(left.pinnedAt) : 0;
+      const rightPinned = right.pinnedAt ? Date.parse(right.pinnedAt) : 0;
+      return rightPinned - leftPinned;
+    }), [chats, search]);
 
   useEffect(() => {
     if (!profile || !supabase) return;
@@ -222,13 +228,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     if (!profile || !supabase) return;
     let active = true;
     setConversationLoadError("");
-    void loadMyConversations().then(rows => {
+    void Promise.all([loadMyConversations(), loadConversationSettings()]).then(([rows, settings]) => {
       if (!active) return;
+      const settingsByConversation = new Map(settings.map(setting => [setting.conversation_id, setting]));
       const loadedChats: Chat[] = rows.map(row => {
         const displayName = row.conversation_kind === "group"
           ? row.conversation_title ?? "Group conversation"
           : row.other_display_name ?? row.other_username ?? "Conversation";
         const initials = displayName.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+        const preference = settingsByConversation.get(row.conversation_id);
         return {
           id: row.conversation_id,
           name: displayName,
@@ -241,6 +249,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           conversationId: row.conversation_id,
           isGroup: row.conversation_kind === "group",
           remoteUserId: row.other_user_id ?? undefined,
+          pinnedAt: preference?.pinned_at ?? null,
+          mutedUntil: preference?.muted_until ?? null,
+          archivedAt: preference?.archived_at ?? null,
+          hiddenAt: preference?.hidden_at ?? null,
         };
       });
       setChats(old => {
@@ -250,7 +262,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
         return [...merged.values()];
       });
     }).catch(caught => {
-      if (active) setConversationLoadError(caught instanceof Error ? caught.message : "Could not load conversations.");
+      if (active) setConversationLoadError(caught instanceof Error ? caught.message : "Could not load conversations and their preferences.");
     });
     return () => { active = false; };
   }, [profile?.id]);
@@ -299,6 +311,57 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       setDiscoveryEnabled(!nextValue);
       setDiscoveryError(error.message);
     }
+  }
+
+  async function updateConversationPreference(
+    chat: Chat,
+    changes: Partial<Pick<ConversationSettings, "pinned_at" | "muted_until" | "archived_at" | "hidden_at">>,
+  ) {
+    if (!chat.conversationId) return;
+    try {
+      const saved = await saveConversationSettings(chat.conversationId, changes);
+      const updated = {
+        pinnedAt: saved.pinned_at,
+        mutedUntil: saved.muted_until,
+        archivedAt: saved.archived_at,
+        hiddenAt: saved.hidden_at,
+      };
+      setChats(current => current.map(item => item.conversationId === chat.conversationId ? { ...item, ...updated } : item));
+      setActiveChat(current => current?.conversationId === chat.conversationId ? { ...current, ...updated } : current);
+    } catch (error) {
+      Alert.alert("Could not update conversation", error instanceof Error ? error.message : "Please try again.");
+    }
+  }
+
+  function showConversationActions(chat: Chat) {
+    if (!chat.isReal || !chat.conversationId) {
+      Alert.alert("Demo conversation", "Conversation actions are available after you sign in.");
+      return;
+    }
+    const pinned = Boolean(chat.pinnedAt);
+    const muted = Boolean(chat.mutedUntil && Date.parse(chat.mutedUntil) > Date.now());
+    const archived = Boolean(chat.archivedAt);
+    Alert.alert(chat.name, "Manage this conversation on your account.", [
+      {
+        text: pinned ? "Unpin" : "Pin to top",
+        onPress: () => void updateConversationPreference(chat, { pinned_at: pinned ? null : new Date().toISOString() }),
+      },
+      {
+        text: "More options",
+        onPress: () => Alert.alert(chat.name, "Additional conversation controls.", [
+          {
+            text: muted ? "Unmute" : "Mute for 8 hours",
+            onPress: () => void updateConversationPreference(chat, { muted_until: muted ? null : new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString() }),
+          },
+          {
+            text: archived ? "Unarchive" : "Archive",
+            onPress: () => void updateConversationPreference(chat, { archived_at: archived ? null : new Date().toISOString() }),
+          },
+          { text: "Cancel", style: "cancel" },
+        ]),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   }
 
   function sendMessage() {
@@ -543,10 +606,17 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 110 }}
             ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: c.line }]} />}
             renderItem={({ item }) => (
-              <Pressable onPress={() => {
-                if (!item.isReal) setMessages(seedMessages);
-                setActiveChat(item);
-              }} style={styles.chatRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={item.name}
+                accessibilityHint="Open conversation. Long press for pin, mute, and archive options."
+                onLongPress={() => showConversationActions(item)}
+                onPress={() => {
+                  if (!item.isReal) setMessages(seedMessages);
+                  setActiveChat(item);
+                }}
+                style={styles.chatRow}
+              >
                 <Avatar initials={item.initials} color={item.color} online={item.online} />
                 <View style={styles.chatDetails}>
                   <View style={styles.chatTop}>
