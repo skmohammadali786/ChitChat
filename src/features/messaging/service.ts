@@ -235,6 +235,19 @@ export async function sendEncryptedMessage(
     if (!lookupError && existing) return existing as EncryptedMessageRecord;
   }
   if (error) throw error;
+
+  // Push notifications contain only a generic alert and encrypted-message IDs.
+  // The Edge Function never receives message plaintext or encryption keys.
+  void client.functions.invoke("notify-message", {
+    body: { message_id: data.id },
+  }).then(({ error: notificationError }) => {
+    if (notificationError) {
+      console.warn("ChitChat message notification could not be delivered.", notificationError.message);
+    }
+  }).catch(error => {
+    console.warn("ChitChat message notification request failed.", error);
+  });
+
   return data as EncryptedMessageRecord;
 }
 
