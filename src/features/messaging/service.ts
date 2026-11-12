@@ -52,6 +52,30 @@ function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
   }
 }
 
+
+export type DiscoverableProfile = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+};
+
+export async function lookupProfileByUsername(username: string): Promise<DiscoverableProfile | null> {
+  const normalized = username.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(normalized)) {
+    throw new Error("Enter an exact username with 3 to 20 letters, numbers, or underscores.");
+  }
+
+  const client = requireClient();
+  const { data, error } = await client.rpc("lookup_profile_by_username", {
+    search_username: normalized,
+  });
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  return (rows[0] as DiscoverableProfile | undefined) ?? null;
+}
+
 export async function createDirectConversation(targetUserId: string): Promise<string> {
   const client = requireClient();
   const { data, error } = await client.rpc("create_direct_conversation", {
