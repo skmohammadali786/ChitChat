@@ -3,7 +3,8 @@
 ## Platform targets
 - Android and iOS are first-class targets.
 - TypeScript owns the full UI, navigation, accessibility, animations, and supported Supabase client integration.
-- Rust owns portable domain validation, cryptographic boundaries, serialization, and security-sensitive business rules.
+- Rust owns portable domain validation, MLS protocol state, message/media encryption, serialization, and security-sensitive business rules.
+- OpenMLS 0.9.2 is selected for MLS (RFC 9420). It is not integrated yet. See [ADR 0001](adr/0001-e2ee-protocol-openmls.md).
 - A native bridge exposes a narrow API to React Native. Expo Go cannot load a custom Rust native module, so ChitChat requires a custom development build.
 
 ## Workspace
@@ -19,12 +20,18 @@
 ## Native integration plan
 1. Build the Rust crate for Android targets and package it with the React Native Android module.
 2. Build the same crate for iOS targets and package it as an XCFramework.
-3. Expose a small, versioned FFI API through UniFFI or a reviewed C ABI.
+3. Expose a small, versioned FFI API through UniFFI-generated Kotlin and Swift bindings.
 4. Test identical serialization and validation vectors on Android and iOS.
 5. Keep native module calls typed and asynchronous.
 
 ## Why Supabase stays in TypeScript
 Supabase's official client-library matrix currently lists JavaScript/TypeScript, Dart, Swift, and Python. Rust is not listed as an official client. ChitChat uses the supported `supabase-js` client for Auth, PostgREST, Realtime, and Storage while Rust owns local domain logic. Never embed the database password, `service_role`, or secret key in the mobile app.
+
+## Encryption boundary
+- OpenMLS state and private keys stay on the device.
+- Supabase stores public device credentials/key packages and opaque MLS wire messages only.
+- The media key is generated in Rust and distributed only inside an MLS-encrypted application message. Cloudflare R2 stores encrypted media bytes.
+- UTF-8 text and emoji remain part of the encrypted application payload. Reactions and message metadata must be evaluated separately for metadata leakage.
 
 ## Build gate
 The native bridge is not considered implemented until Android and iOS native builds load the module, Rust tests pass, and device-level integration tests verify the same behavior on both platforms.
