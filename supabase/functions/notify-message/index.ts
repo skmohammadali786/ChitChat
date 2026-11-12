@@ -60,6 +60,14 @@ Deno.serve(
 
       const previewByUser = new Map((settings ?? []).map(row => [row.user_id, row.notification_preview]));
       const allowedRecipients = new Set(recipientIds.filter(id => previewByUser.get(id) !== "none"));
+      const { data: senderProfile, error: senderProfileError } = await admin
+        .from("profiles")
+        .select("display_name,username")
+        .eq("id", senderId)
+        .maybeSingle();
+      if (senderProfileError) throw senderProfileError;
+      const senderLabel = senderProfile?.display_name?.trim() ||
+        (senderProfile?.username ? `@${senderProfile.username}` : "Someone");
       const targets = (devices ?? []).filter(device =>
         allowedRecipients.has(device.user_id) &&
         (device.expo_push_token.startsWith("ExponentPushToken[") || device.expo_push_token.startsWith("ExpoPushToken["))
@@ -75,7 +83,7 @@ Deno.serve(
           to: device.expo_push_token,
           sound: "default",
           title: "ChitChat",
-          body: "You have a new message.",
+          body: `${senderLabel} sent you a message.`,
           priority: "high",
           data: {
             type: "new_message",
