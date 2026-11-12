@@ -13,7 +13,7 @@ PR #1 remains draft. Do not merge.
 - Group create/list/add/remove/rename/leave/owner-transfer RPCs and management screens.
 - User-scoped theme, auto-reveal, read-receipt, online, typing and last-seen preferences.
 - Private Realtime authorization and an active-conversation presence/typing subscription in the app.
-- Per-recipient delivery/read receipt records and RPCs. The active chat UI does not yet load messages or display receipt state.
+- Per-recipient delivery/read receipt records and RPCs. Receipt RLS now allows only the recipient and original sender to read each receipt, not every group member. The active chat UI does not yet load messages or display receipt state.
 - Scheduled-message envelope storage and a pg_cron dispatcher. End-user scheduling UI and end-to-end delivery tests are incomplete.
 - Private Cloudflare R2 bucket `chitchat-media`, with public `r2.dev` access disabled.
 - Deployed `chitchat-media-api` Worker with an R2 binding and Supabase session/conversation-membership checks. Unauthenticated access was rejected. Authenticated device upload/download tests remain.
