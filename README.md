@@ -22,7 +22,7 @@ Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md), then set the Supabase U
 ## Current implementation
 - Chat list, local message composer, secret reveal and re-hide interaction.
 - Light and dark appearance and recipient auto-reveal preference.
-- Supabase email/password sign-up and sign-in.
+- Supabase email/password sign-up and sign-in with mobile auth sessions stored in Expo SecureStore.
 - Email confirmation deep-link handling.
 - Profile onboarding with username validation and a private profile record.
 - Demo mode remains available without backend credentials.
