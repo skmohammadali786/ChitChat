@@ -264,3 +264,62 @@ begin
   end if;
 end;
 $$;
+
+
+-- Return only conversations the current authenticated account belongs to.
+-- For direct chats, expose the other member's safe profile fields. Group
+-- member listing will be added with the group membership controls.
+create or replace function public.list_my_conversations()
+returns table (
+  conversation_id uuid,
+  conversation_kind text,
+  conversation_title text,
+  updated_at timestamptz,
+  other_user_id uuid,
+  other_username text,
+  other_display_name text,
+  other_avatar_url text
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_requester_id uuid := auth.uid();
+begin
+  if v_requester_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  return query
+    select
+      conversation_row.id,
+      conversation_row.kind,
+      conversation_row.title,
+      conversation_row.updated_at,
+      other_member.user_id,
+      other_profile.username,
+      other_profile.display_name,
+      other_profile.avatar_url
+    from public.conversations as conversation_row
+    join public.conversation_members as my_membership
+      on my_membership.conversation_id = conversation_row.id
+     and my_membership.user_id = v_requester_id
+    left join lateral (
+      select member_row.user_id
+      from public.conversation_members as member_row
+      where member_row.conversation_id = conversation_row.id
+        and member_row.user_id <> v_requester_id
+      order by member_row.joined_at asc
+      limit 1
+    ) as other_member on true
+    left join public.profiles as other_profile
+      on other_profile.id = other_member.user_id
+    order by conversation_row.updated_at desc
+    limit 200;
+end;
+$$;
+
+revoke all on function public.list_my_conversations() from public, anon;
+grant execute on function public.list_my_conversations() to authenticated;
