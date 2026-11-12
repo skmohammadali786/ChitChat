@@ -8,9 +8,11 @@ type CoreModule = {
 const nativeCore = NativeModules.ChitChatCore as CoreModule | undefined;
 
 /**
- * Rust bridge contract. Native implementations are provided by the Android
- * UniFFI/JNI and iOS Swift bridge targets when the development client is built.
- * Expo Go does not contain this custom native module.
+ * Native Rust bridge contract.
+ *
+ * The module is only present in ChitChat development/production builds. Expo
+ * Go intentionally does not contain custom native modules. Never silently
+ * substitute JS crypto or plaintext when this module is missing.
  */
 export const chitchatCore = {
   get available(): boolean {
@@ -18,12 +20,16 @@ export const chitchatCore = {
   },
 
   async validateProfile(payload: unknown): Promise<void> {
-    if (!nativeCore) throw new Error("ChitChat Rust core is not linked. Use a custom development build.");
+    if (!nativeCore) {
+      throw new Error("ChitChat Rust core is not linked. Use a custom native development build.");
+    }
     await nativeCore.validateProfile(JSON.stringify(payload));
   },
 
   async validateEnvelope(payload: unknown): Promise<void> {
-    if (!nativeCore) throw new Error("ChitChat Rust core is not linked. Secure messaging is disabled.");
+    if (!nativeCore) {
+      throw new Error("Secure messaging is disabled because the Rust core is unavailable.");
+    }
     await nativeCore.validateEnvelope(JSON.stringify(payload));
   },
 };
