@@ -2,7 +2,7 @@ name: ChitChat checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/rust-native-supabase]
   pull_request:
     branches: [main]
 
@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22.13.x
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - run: npm install --no-audit --no-fund
       - run: npx expo install --check
       - run: npm run typecheck
       - run: npx expo-doctor
@@ -24,8 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - run: cargo test --workspace
