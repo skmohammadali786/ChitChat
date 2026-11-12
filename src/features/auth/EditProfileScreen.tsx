@@ -53,7 +53,7 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
           bio: cleanBio,
         })
         .eq("id", profile.id)
-        .select("id, username, display_name, bio, avatar_url, discoverable")
+        .select("id, username, display_name, bio, avatar_path, discoverable")
         .single();
 
       if (updateError) {
