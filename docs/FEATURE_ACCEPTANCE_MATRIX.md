@@ -34,7 +34,7 @@ Legend:
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
 | Search | NOT STARTED | Local encrypted search index, no server-side plaintext indexing |
 | Pin, mute, archive, delete | NOT STARTED | Per-user conversation state and deletion semantics |
-| Typing and presence | PARTIAL | Private membership-authorized Realtime channels, a privacy-aware client presence service and server policies exist; active-chat lifecycle wiring remains |
+| Typing and presence | PARTIAL | Private membership-authorized Realtime channels, privacy-aware client service, active-chat online state and incoming typing indicator are wired; outgoing typing events and device tests remain |
 
 ## Secret content
 
@@ -82,7 +82,7 @@ Legend:
 | App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
 | Notification privacy | NOT STARTED | Hide content and secret-message previews |
-| Last seen/read receipts privacy | PARTIAL | Read receipt, online and typing controls are wired to Supabase; last-seen control and active-chat presence wiring remain |
+| Last seen/read receipts privacy | PARTIAL | Read receipt, online, typing and last-seen controls are wired to Supabase; read receipt UI and cross-device tests remain |
 | Contact permissions | NOT STARTED | Optional OS permission and privacy-safe discovery |
 | Spam and abuse controls | PARTIAL | Username lookup throttling exists; message, media and invite controls remain |
 
