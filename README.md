@@ -7,7 +7,7 @@ ChitChat is an Android and iOS messaging app with a TypeScript React Native UI a
 - Rust owns portable domain validation, encrypted-envelope validation, and the future cryptographic boundary.
 - Supabase provides authentication, database persistence, private storage, and realtime events.
 
-See [Rust architecture](docs/RUST_ARCHITECTURE.md), [security decisions](docs/SECURITY_DECISIONS.md), and the [complete feature acceptance matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md).
+See [Rust architecture](docs/RUST_ARCHITECTURE.md), [security decisions](docs/SECURITY_DECISIONS.md), [OpenMLS E2EE ADR](docs/adr/0001-e2ee-protocol-openmls.md), and the [complete feature acceptance matrix](docs/FEATURE_ACCEPTANCE_MATRIX.md).
 
 ## Backend
 The dedicated project is `roqostmesaxplurzjoin`. Its schema is installed and managed with Supabase migrations. See [backend setup](docs/SUPABASE_SETUP.md) and [Cloudflare R2 media storage](docs/CLOUDFLARE_MEDIA.md).
