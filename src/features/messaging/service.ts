@@ -94,9 +94,38 @@ export async function unblockUser(targetUserId: string): Promise<void> {
 
 export async function loadBlockedUsers(): Promise<BlockedProfile[]> {
   const client = requireClient();
-  const { data, error } = await client.rpc("list_my_blocks");
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw authError;
+  const user = authData.user;
+  if (!user) throw new Error("Sign in before loading your block list.");
+
+  const { data, error } = await client
+    .from("user_blocks")
+    .select("blocked_id, created_at")
+    .eq("blocker_id", user.id);
   if (error) throw error;
-  return (Array.isArray(data) ? data : []) as BlockedProfile[];
+
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map(row => row.blocked_id);
+  const { data: profiles, error: profilesError } = await client
+    .from("profiles")
+    .select("id, username, display_name, avatar_path")
+    .in("id", ids);
+  if (profilesError) throw profilesError;
+
+  const profileById = new Map((profiles ?? []).map(profile => [profile.id, profile]));
+  return rows.map(row => {
+    const profile = profileById.get(row.blocked_id);
+    return {
+      blocked_id: row.blocked_id,
+      username: profile?.username ?? null,
+      display_name: profile?.display_name ?? null,
+      avatar_path: profile?.avatar_path ?? null,
+      created_at: row.created_at,
+    };
+  });
 }
 
 export type ConversationSummary = {
