@@ -1,3 +1,11 @@
 [workspace]
 resolver = "2"
 members = ["rust/chitchat-core"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
