@@ -98,12 +98,27 @@ export async function saveConversationSettings(
   changes: Partial<Pick<ConversationSettings, "pinned_at" | "muted_until" | "archived_at" | "hidden_at">>,
 ): Promise<ConversationSettings> {
   const userId = await currentUserId();
-  const { data, error } = await client()
+  const { data: existing, error: lookupError } = await client()
     .from("conversation_user_settings")
+    .select("conversation_id,user_id,pinned_at,muted_until,archived_at,hidden_at,updated_at")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+
+  const valueFor = (key: "pinned_at" | "muted_until" | "archived_at" | "hidden_at") =>
+    Object.prototype.hasOwnProperty.call(changes, key)
+      ? changes[key] ?? null
+      : existing?.[key] ?? null;
+
+  const { data, error } = await client()
     .upsert({
       conversation_id: conversationId,
       user_id: userId,
-      ...changes,
+      pinned_at: valueFor("pinned_at"),
+      muted_until: valueFor("muted_until"),
+      archived_at: valueFor("archived_at"),
+      hidden_at: valueFor("hidden_at"),
       updated_at: new Date().toISOString(),
     }, { onConflict: "conversation_id,user_id" })
     .select("*")
