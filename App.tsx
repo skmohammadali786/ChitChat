@@ -238,7 +238,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       </View>
       {action ? (
         <Pressable accessibilityRole="button" onPress={action.onPress} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-          <Text style={{ color: "#B42318", fontSize: 12, fontWeight: "800" }}>{action.label}</Text>
+          <Text style={{ color: action.label === "Block" ? "#B42318" : palette.brand, fontSize: 12, fontWeight: "800" }}>{action.label}</Text>
         </Pressable>
       ) : !back && newAction ? (
         <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction}>
