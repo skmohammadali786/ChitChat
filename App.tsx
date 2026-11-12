@@ -16,6 +16,7 @@ import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScree
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
+import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference } from "./src/lib/preferences";
@@ -62,6 +63,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [showReadReceipts, setShowReadReceipts] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [showTypingStatus, setShowTypingStatus] = useState(true);
+  const [showLastSeen, setShowLastSeen] = useState(true);
+  const [typingUserId, setTypingUserId] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState("");
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -161,6 +164,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       setShowReadReceipts(saved.show_read_receipts);
       setShowOnlineStatus(saved.show_online_status);
       setShowTypingStatus(saved.show_typing_status);
+      setShowLastSeen(saved.show_last_seen);
     }).catch(error => {
       if (active) setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
     });
@@ -250,6 +254,32 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     });
     return () => { active = false; };
   }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile || !supabase || !activeChat?.isReal || !activeChat.conversationId) return;
+    let active = true;
+    let presence: ReturnType<typeof subscribeToConversationPresence> | null = null;
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (!active || error || !data.user) return;
+      presence = subscribeToConversationPresence(
+        activeChat.conversationId!,
+        data.user.id,
+        members => {
+          const others = Object.values(members).flat().filter(member => member.user_id !== data.user!.id);
+          setActiveChat(current => current?.conversationId === activeChat.conversationId
+            ? { ...current, online: others.some(member => member.online) }
+            : current);
+        },
+        typing => setTypingUserId(typing.typing ? typing.userId : null),
+        { showOnlineStatus, showTypingStatus, showLastSeen },
+      );
+    });
+    return () => {
+      active = false;
+      setTypingUserId(null);
+      if (presence) void presence.stop();
+    };
+  }, [profile?.id, activeChat?.conversationId, activeChat?.isReal, showOnlineStatus, showTypingStatus, showLastSeen]);
 
   useEffect(() => {
     setDiscoveryEnabled(profile?.discoverable ?? false);
@@ -414,7 +444,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <Header
           title={activeChat.name}
-          subtitle={activeChat.online ? "online now" : "last seen recently"}
+          subtitle={typingUserId ? "typing…" : activeChat.isGroup ? "group conversation" : activeChat.online ? "online now" : showLastSeen ? "last seen recently" : "status hidden"}
           back={() => setActiveChat(null)}
           action={activeChat.isGroup ? {
             label: "Members",
@@ -646,6 +676,17 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
               <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
                 <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Typing indicator</Text><Text style={[styles.settingHint, { color: c.muted }]}>Share when you are typing in a conversation.</Text></View>
                 <Pressable accessibilityRole="switch" accessibilityState={{ checked: showTypingStatus }} onPress={() => void updatePrivacySetting("show_typing_status", !showTypingStatus)} style={[styles.toggle, showTypingStatus && styles.toggleOn]}><View style={[styles.toggleKnob, showTypingStatus && styles.toggleKnobOn]} /></Pressable>
+              </View>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Last seen</Text><Text style={[styles.settingHint, { color: c.muted }]}>Share the last time you were active.</Text></View>
+                <Pressable accessibilityRole="switch" accessibilityState={{ checked: showLastSeen }} onPress={() => {
+                  const next = !showLastSeen;
+                  setShowLastSeen(next);
+                  void saveUserSettings({ show_last_seen: next }).catch(error => {
+                    setShowLastSeen(!next);
+                    setSettingsError(error instanceof Error ? error.message : "Could not save last-seen setting.");
+                  });
+                }} style={[styles.toggle, showLastSeen && styles.toggleOn]}><View style={[styles.toggleKnob, showLastSeen && styles.toggleKnobOn]} /></Pressable>
               </View>
             </>
           ) : null}
