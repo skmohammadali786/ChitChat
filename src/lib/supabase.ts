@@ -127,6 +127,6 @@ export type ChitChatProfile = {
   username: string;
   display_name: string;
   bio: string;
-  avatar_url: string | null;
+  avatar_path: string | null;
   discoverable: boolean;
 };
