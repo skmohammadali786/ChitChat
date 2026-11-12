@@ -1,7 +1,7 @@
 # Security decision record
 
 ## Status
-No end-to-end encryption protocol has been selected or integrated in this prototype. ChitChat must not describe conversations as end-to-end encrypted until device key generation, authentication, encryption, decryption, rotation, recovery, multi-device support, and interoperability tests are complete and independently reviewed.
+OpenMLS 0.9.2 using MLS (RFC 9420) is selected for implementation. It is not integrated yet. ChitChat must not describe conversations as end-to-end encrypted until device key generation, authentication, encryption, decryption, rotation, recovery, multi-device support, and interoperability tests are complete and independently reviewed. See [ADR 0001](adr/0001-e2ee-protocol-openmls.md).
 
 ## Current server boundary
 - The message schema stores a ciphertext string, nonce, key version, client message ID, and a cryptographic metadata header.
@@ -10,19 +10,16 @@ No end-to-end encryption protocol has been selected or integrated in this protot
 - The real conversation UI therefore does not expose a message composer yet.
 - Supabase never receives private identity keys or ratchet state in this design.
 
-## Protocol evaluation
+## Selected protocol: OpenMLS
+OpenMLS is the chosen Rust implementation of MLS (RFC 9420). Direct chats will use two-member MLS groups; group chats will use multi-member MLS groups. Supabase remains the ciphertext transport and public device/key-package directory. Private keys and MLS state remain on devices.
 
-### Signal Protocol / libsignal
-The official Signal implementation contains the Signal Protocol, including Double Ratchet, and cryptographic primitives. Its repository states that the library is intended for Signal clients and server use, and that use outside Signal is unsupported. Its bridges and APIs can change without notice. The current Expo/Hermes app must not import a Node-only bridge and assume it works on Android and iOS.
+OpenMLS is MIT-licensed. Its published target matrix lists Android and iOS as buildable but not tested targets, so ChitChat must add native build and cross-platform device tests. The first implementation will pin OpenMLS 0.9.2 and the mandatory X25519/AES-128-GCM/SHA-256/Ed25519 ciphersuite.
 
-Reference: https://github.com/signalapp/libsignal
+Reference: https://github.com/openmls/openmls
 
-### Matrix Rust SDK
-The Matrix Rust SDK is a maintained Rust client SDK with end-to-end encryption and device verification support. It is a credible option if ChitChat chooses to adopt Matrix's client/server protocol and infrastructure. It is not a drop-in encryption package for the current Supabase schema.
-
-References:
-- https://www.matrix.org/ecosystem/sdks/
-- https://matrix-org.github.io/matrix-rust-sdk/matrix_sdk/encryption/index.html
+## Rejected protocol options
+- Signal libsignal: the official repository states use outside Signal is unsupported and APIs/bridges can change without notice.
+- Matrix Rust SDK: suitable only if ChitChat adopts Matrix's client/server protocol and homeserver; it is not a drop-in crypto layer for the Supabase message schema.
 
 ## Required evaluation before implementation
 1. Confirm official support for Android, iOS, React Native 0.88, and Hermes.
