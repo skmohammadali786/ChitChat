@@ -35,3 +35,24 @@ References:
 
 ## Release rule
 Never silently fall back to plaintext. If encryption is unavailable, message sending must fail closed and explain that secure messaging is not ready.
+
+## Additional candidate evaluated: OpenE2EE Signal Protocol SDK
+
+The `@open-e2ee/signal-protocol-sdk` project documents a pure-TypeScript protocol profile and an Expo adapter based on Expo SQLite with SQLCipher and SecureStore. Its published runtime matrix specifically lists Expo development/release builds and React Native Hermes. This makes it a more relevant technical candidate for a controlled Expo 58 spike than a Node N-API libsignal package.
+
+References:
+- https://docs.open-e2ee.dev/start/expo
+- https://docs.open-e2ee.dev/reference/runtime-support
+- https://github.com/open-e2ee/signal-protocol-js
+
+It is **not selected for production**. Its own assurance document says there is no independent-firm audit. It also documents a versioned Signal-derived profile that is not wire-compatible with Signal Messenger/libsignal and contains protocol deviations. Its public CI and adversarial-agent review do not substitute for an independent cryptographic audit.
+
+A contained evaluation should:
+1. Pin an exact SDK version and lockfile.
+2. Build on a dedicated branch using an Expo development build, not Expo Go.
+3. Verify the implementation against published test vectors and the published deviation document.
+4. Exercise two independent Android devices and two independent iOS devices.
+5. Test key changes, device replacement, backup/recovery, offline delivery, duplicates, reordering, group membership changes, and secret attachments.
+6. Review the storage adapter, threat model, supply chain, and protocol design with an independent cryptography specialist.
+
+Until those steps are completed, ChitChat must keep real conversation sending disabled. No encryption SDK has been added to the runtime.
