@@ -124,7 +124,9 @@ pub enum MediaKind {
 pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
     const MAX_BLOCKS: usize = 100;
     const MAX_TEXT_BYTES: usize = 64 * 1024;
+    const MAX_TOTAL_TEXT_BYTES: usize = 512 * 1024;
     const MAX_MEDIA_BYTES: u64 = 50 * 1024 * 1024;
+    let mut total_text_bytes = 0usize;
 
     if content.version != 1 || content.blocks.is_empty() || content.blocks.len() > MAX_BLOCKS {
         return Err(CoreError::InvalidMessageContent);
@@ -133,7 +135,12 @@ pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
     for block in &content.blocks {
         match block {
             MessageBlock::Text { text, .. } => {
-                if text.is_empty() || text.len() > MAX_TEXT_BYTES || text.contains('\0') {
+                total_text_bytes = total_text_bytes.saturating_add(text.len());
+                if text.is_empty()
+                    || text.len() > MAX_TEXT_BYTES
+                    || total_text_bytes > MAX_TOTAL_TEXT_BYTES
+                    || text.contains('\0')
+                {
                     return Err(CoreError::InvalidMessageContent);
                 }
             }
@@ -147,9 +154,20 @@ pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
                 let valid_key = file_key.len() == 43
                     && file_key
                         .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+                    && file_key.as_bytes().last().is_some_and(|last| {
+                        match last {
+                            b'A'..=b'Z' => (last - b'A') % 4 == 0,
+                            b'a'..=b'z' => (last - b'a' + 26) % 4 == 0,
+                            b'0'..=b'9' => (last - b'0' + 52) % 4 == 0,
+                            b'-' | b'_' => false,
+                            _ => false,
+                        }
+                    });
                 let valid_digest = sha256.len() == 64
-                    && sha256.bytes().all(|byte| byte.is_ascii_hexdigit());
+                    && sha256
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
                 if !valid_key
                     || *crypto_version == 0
                     || !valid_digest
