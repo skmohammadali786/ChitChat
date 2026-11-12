@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
+import { supabase } from "../../lib/supabase";
 import {
   addGroupMembers, loadGroupMembers, removeGroupMember, renameGroupConversation,
   transferGroupOwnership, type GroupMember
@@ -13,14 +14,15 @@ import { lookupProfileByUsername } from "./service";
 
 type Props = {
   conversationId: string;
+  initialTitle: string;
   onBack: () => void;
   onRenamed: (title: string) => void;
 };
 
-export function GroupManagementScreen({ conversationId, onBack, onRenamed }: Props) {
+export function GroupManagementScreen({ conversationId, initialTitle, onBack, onRenamed }: Props) {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [newUsername, setNewUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -32,7 +34,6 @@ export function GroupManagementScreen({ conversationId, onBack, onRenamed }: Pro
   const refresh = useCallback(async () => {
     setError("");
     try {
-      const { supabase } = await import("../../lib/supabase");
       if (!supabase) throw new Error("Supabase is not configured.");
       const { data, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -40,13 +41,12 @@ export function GroupManagementScreen({ conversationId, onBack, onRenamed }: Pro
       setCurrentUserId(data.user.id);
       const rows = await loadGroupMembers(conversationId);
       setMembers(rows);
-      if (!title && rows.length) setTitle("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load group members.");
     } finally {
       setLoading(false);
     }
-  }, [conversationId, title]);
+  }, [conversationId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -108,7 +108,7 @@ export function GroupManagementScreen({ conversationId, onBack, onRenamed }: Pro
   function confirmTransfer(member: GroupMember) {
     Alert.alert(
       "Transfer group ownership?",
-      `@ ${member.username ?? member.display_name ?? "This member"} will become the group owner. You will become an admin.`,
+      `@${member.username ?? member.display_name ?? "This member"} will become the group owner. You will become an admin.`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Transfer", onPress: () => void run(() => transferGroupOwnership(conversationId, member.user_id)) },
