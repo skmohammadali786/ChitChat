@@ -69,6 +69,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState("");
+  const [notificationPreview, setNotificationPreview] = useState<"none" | "sender" | "full">("sender");
   const pushSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
@@ -171,6 +172,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       setShowOnlineStatus(saved.show_online_status);
       setShowTypingStatus(saved.show_typing_status);
       setShowLastSeen(saved.show_last_seen);
+      setNotificationPreview(saved.notification_preview);
     }).catch(error => {
       if (active) setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
     });
@@ -201,6 +203,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       pushSubscriptionRef.current = null;
     };
   }, [profile?.id]);
+
+  async function updateNotificationPreview(next: "none" | "sender") {
+    const previous = notificationPreview;
+    setNotificationPreview(next);
+    setSettingsError("");
+    if (!profile) return;
+    try {
+      await saveUserSettings({ notification_preview: next });
+    } catch (error) {
+      setNotificationPreview(previous);
+      setSettingsError(error instanceof Error ? error.message : "Could not save notification privacy.");
+    }
+  }
 
   async function togglePushNotifications() {
     setPushBusy(true);
@@ -734,6 +749,27 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
                 </Pressable>
               </View>
               {pushError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{pushError}</Text> : null}
+              <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.sm }]}>Notification privacy</Text>
+              <View style={[styles.settingCard, { backgroundColor: c.surface, flexDirection: "column", alignItems: "stretch" }]}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Who can appear in alerts?</Text>
+                <Text style={[styles.settingHint, { color: c.muted, marginBottom: spacing.md }]}>Message text is never included in push notifications. This protects encrypted conversations on your lock screen.</Text>
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  {([{ value: "none", label: "Off" }, { value: "sender", label: "Sender only" }] as const).map(option => {
+                    const selected = notificationPreview === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: selected }}
+                        onPress={() => void updateNotificationPreview(option.value)}
+                        style={{ flex: 1, minHeight: 42, borderRadius: radius.md, borderWidth: 1, borderColor: selected ? palette.brand : c.line, backgroundColor: selected ? (dark ? "#302A55" : "#EEEAFE") : c.raised, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}
+                      >
+                        <Text style={{ color: selected ? palette.brand : c.text, fontSize: 12, fontWeight: "800" }}>{option.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
               <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>Privacy controls</Text>
               <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
                 <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Read receipts</Text><Text style={[styles.settingHint, { color: c.muted }]}>Let people know when you have read their messages.</Text></View>
