@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { validateEnvelopeWithRust } from "../../lib/rustCore";
 
 export type EncryptedMessageType = "text" | "image" | "video" | "audio" | "file";
 
@@ -191,6 +192,16 @@ export async function sendEncryptedMessage(
   envelope: EncryptedMessageEnvelope
 ): Promise<EncryptedMessageRecord> {
   validateEnvelope(envelope);
+  // Rust validates the serialized envelope in custom native builds. This
+  // remains a structural check only, never proof of end-to-end encryption.
+  await validateEnvelopeWithRust({
+    client_message_id: envelope.client_message_id,
+    message_kind: envelope.message_type,
+    ciphertext: envelope.ciphertext,
+    nonce: envelope.nonce,
+    crypto_header: envelope.crypto_header,
+    key_version: envelope.key_version,
+  });
   const client = requireClient();
   const { data: { user }, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
