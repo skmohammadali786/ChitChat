@@ -28,13 +28,13 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Supabase create/list/add/remove/rename/transfer-owner RPCs are installed; group UI, invitations, role management and E2EE key rotation remain |
+| Groups | PARTIAL | Supabase group RPCs, group creation UI, member listing, add/remove, rename, leave and owner transfer UI exist; invitations and E2EE key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | NOT STARTED | Respect sender policy and platform limitations |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
 | Search | NOT STARTED | Local encrypted search index, no server-side plaintext indexing |
 | Pin, mute, archive, delete | NOT STARTED | Per-user conversation state and deletion semantics |
-| Typing and presence | PARTIAL | Private membership-authorized Realtime channels and online/typing/last-seen privacy policies exist; chat UI integration remains |
+| Typing and presence | PARTIAL | Private membership-authorized Realtime channels, a privacy-aware client presence service and server policies exist; active-chat lifecycle wiring remains |
 
 ## Secret content
 
@@ -82,7 +82,7 @@ Legend:
 | App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
 | Notification privacy | NOT STARTED | Hide content and secret-message previews |
-| Last seen/read receipts privacy | PARTIAL | Synced setting fields and read-receipt enforcement exist; full UI and presence wiring remain |
+| Last seen/read receipts privacy | PARTIAL | Read receipt, online and typing controls are wired to Supabase; last-seen control and active-chat presence wiring remain |
 | Contact permissions | NOT STARTED | Optional OS permission and privacy-safe discovery |
 | Spam and abuse controls | PARTIAL | Username lookup throttling exists; message, media and invite controls remain |
 
@@ -99,7 +99,7 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Light/dark/system themes | PARTIAL | Persisted settings and all screens |
+| Light/dark/system themes | PARTIAL | Dark/light preference syncs to Supabase user settings; system mode and all-screen token coverage remain |
 | Accent palette selection | PARTIAL | Synced accent token exists; palette picker and all-screen UI wiring remain |
 | Design system | PARTIAL | Astryx-informed conventions, reusable components and state coverage |
 | Reduced motion | PARTIAL | All reveal and navigation animation respects OS setting |
