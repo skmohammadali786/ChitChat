@@ -123,7 +123,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select
     auth.uid() is null
     or auth.uid() <> candidate_sender_id
@@ -145,8 +145,7 @@ as $
       where conversation_row.id = target_conversation_id
         and conversation_row.kind = 'direct'
     );
-$;
-
+$$;
 revoke all on function public.is_direct_conversation_blocked(uuid, uuid) from public, anon;
 grant execute on function public.is_direct_conversation_blocked(uuid, uuid) to authenticated;
 
