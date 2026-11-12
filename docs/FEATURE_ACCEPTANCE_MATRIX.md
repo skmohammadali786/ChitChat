@@ -69,7 +69,7 @@ Legend:
 | Offline outbox | NOT STARTED | Encrypted local queue, retry, idempotency and conflict handling |
 | Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
 | Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
-| Push notifications | PARTIAL | Expo token registration table and client service exist; Edge Function delivery, token validation and retries remain |
+| Push notifications | PARTIAL | Expo token registration, authenticated generic sender-only delivery, mute/opt-out enforcement and notification tap routing exist; EAS credentials and real-device delivery/retry tests remain |
 | Scheduled messages | PARTIAL | Encrypted envelope table, client scheduling service and pg_cron dispatcher are installed; UI and delivery tests remain |
 | Disappearing messages | NOT STARTED | Expiry policy, server cleanup and local cache handling |
 
