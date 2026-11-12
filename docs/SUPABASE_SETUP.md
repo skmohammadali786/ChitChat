@@ -6,7 +6,7 @@ ChitChat currently uses Supabase Auth for email/password accounts and Postgres f
 Create a new project named `ChitChat` in your Supabase organization. Do not reuse Momently or MT Learning. For users primarily in India, Mumbai (`ap-south-1`) is a sensible starting region. Choose a region based on where your first users will be located.
 
 ## 2. Create the profiles table
-Open the new project's SQL Editor. Copy and run the contents of [profiles.sql](../supabase/setup/profiles.sql).
+Open the new project's SQL Editor. First copy and run [profiles.sql](../supabase/setup/profiles.sql). Then run [messaging.sql](../supabase/setup/messaging.sql) to create conversations, membership rules, encrypted-message storage, direct-conversation creation, and Realtime publication setup.
 
 The table stores only a profile's username, display name, optional bio, and avatar URL. Row Level Security is enabled. The current policy lets an authenticated user read and change only their own profile. Anonymous access is revoked.
 
@@ -53,4 +53,4 @@ Test on a development build or a compatible Expo Go release:
 6. Sign out and confirm the app returns to the authentication screen.
 
 ## Current limits
-The profile table is private by default. Username discovery, public profile browsing, profile photo upload, password recovery, message persistence, realtime delivery, and end-to-end encryption are not part of this phase. Add explicit, reviewed policies before introducing public profile search or contact discovery.
+The profile table is private by default. The messaging schema accepts ciphertext envelopes only, and RLS restricts conversations and messages to members. Do not send plaintext through the messaging service. The client-side cryptography and device-key lifecycle are not implemented yet, so the app cannot send or decrypt real messages safely until that security layer is completed and reviewed. Username discovery, profile photo upload, push notifications, and group administration are also not implemented. Add explicit, reviewed policies before introducing public profile search or contact discovery.
