@@ -14,8 +14,8 @@ export function subscribeToConversationPresence(
   onTyping: (payload: { userId: string; typing: boolean }) => void,
 ) {
   if (!supabase) throw new Error("Supabase is not configured.");
-  const channel = supabase.channel(`presence:${conversationId}`, {
-    config: { presence: { key: userId }, broadcast: { self: false } },
+  const channel = supabase.channel(`conversation:${conversationId}`, {
+    config: { private: true, presence: { key: userId }, broadcast: { self: false } },
   });
 
   channel
@@ -25,8 +25,9 @@ export function subscribeToConversationPresence(
       if (value.userId && typeof value.typing === "boolean" && value.userId !== userId) {
         onTyping({ userId: value.userId, typing: value.typing });
       }
-    })
-    .subscribe(status => {
+    });
+
+  void supabase.realtime.setAuth().then(() => channel.subscribe(status => {
       if (status === "SUBSCRIBED") {
         void channel.track({
           user_id: userId,
@@ -35,7 +36,7 @@ export function subscribeToConversationPresence(
           last_active_at: new Date().toISOString(),
         } satisfies PresenceMember);
       }
-    });
+    }));
 
   return {
     async setTyping(typing: boolean) {
