@@ -13,6 +13,7 @@ import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
 import { EditProfileScreen } from "./src/features/auth/EditProfileScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScreen";
+import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
@@ -20,7 +21,7 @@ import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/
 import { loadPreferences, savePreference } from "./src/lib/preferences";
 import { loadUserSettings, saveUserSettings } from "./src/features/settings/userSettings";
 
-type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; conversationId?: string; remoteUserId?: string };
+type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
 
 const initialChats: Chat[] = [
@@ -44,6 +45,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showGroupCreation, setShowGroupCreation] = useState(false);
+  const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
@@ -181,6 +183,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           unread: 0,
           isReal: true,
           conversationId: row.conversation_id,
+          isGroup: row.conversation_kind === "group",
           remoteUserId: row.other_user_id ?? undefined,
         };
       });
@@ -270,6 +273,23 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     );
   }
 
+  if (showGroupManagement && activeChat?.isGroup && activeChat.conversationId) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <GroupManagementScreen
+          conversationId={activeChat.conversationId}
+          initialTitle={activeChat.name}
+          onBack={() => setShowGroupManagement(false)}
+          onRenamed={title => {
+            setActiveChat(current => current ? { ...current, name: title } : current);
+            setChats(current => current.map(chat => chat.conversationId === activeChat.conversationId ? { ...chat, name: title } : chat));
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (showGroupCreation) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -287,6 +307,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
               time: "now",
               unread: 0,
               isReal: true,
+              isGroup: true,
               conversationId,
             };
             setChats(old => [newChat, ...old.filter(chat => chat.conversationId !== conversationId)]);
@@ -338,7 +359,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           title={activeChat.name}
           subtitle={activeChat.online ? "online now" : "last seen recently"}
           back={() => setActiveChat(null)}
-          action={activeChat.isReal && activeChat.remoteUserId ? {
+          action={activeChat.isGroup ? {
+            label: "Members",
+            onPress: () => setShowGroupManagement(true),
+          } : activeChat.isReal && activeChat.remoteUserId ? {
             label: "Block",
             onPress: () => Alert.alert(
               "Block this account?",
