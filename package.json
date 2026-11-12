@@ -17,7 +17,10 @@
     "build:rust:android": "cargo build --manifest-path rust/chitchat-core/Cargo.toml --target aarch64-linux-android --release",
     "build:rust:ios": "cargo build --manifest-path rust/chitchat-core/Cargo.toml --target aarch64-apple-ios --release",
     "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
-    "format:rust": "cargo fmt --all -- --check"
+    "format:rust": "cargo fmt --all -- --check",
+    "build:android": "eas build --platform android --profile preview",
+    "build:ios": "eas build --platform ios --profile preview",
+    "build:both": "eas build --platform all --profile preview"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "3.1.1",
