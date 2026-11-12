@@ -72,7 +72,6 @@ export async function uploadEncryptedMedia(
         "content-type": "application/octet-stream",
         "x-chitchat-media-kind": mediaKind,
         "x-content-sha256": payload.sha256,
-      "x-chitchat-crypto-version": String(payload.cryptoVersion),
         "x-chitchat-crypto-version": String(payload.cryptoVersion),
       },
       body: payload.bytes,
