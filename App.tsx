@@ -306,11 +306,13 @@ export default function App() {
       }
     });
 
-    supabase.auth.startAutoRefresh();
-    const appStateSubscription = AppState.addEventListener("change", state => {
-      if (state === "active") supabase.auth.startAutoRefresh();
-      else supabase.auth.stopAutoRefresh();
-    });
+    const appStateSubscription = Platform.OS !== "web"
+      ? AppState.addEventListener("change", state => {
+          if (state === "active") supabase.auth.startAutoRefresh();
+          else supabase.auth.stopAutoRefresh();
+        })
+      : null;
+    if (Platform.OS !== "web") supabase.auth.startAutoRefresh();
 
     const linkSubscription = Linking.addEventListener("url", ({ url }) => {
       void completeAuthFromUrl(url);
@@ -331,8 +333,8 @@ export default function App() {
       mounted = false;
       subscription.unsubscribe();
       linkSubscription.remove();
-      appStateSubscription.remove();
-      supabase.auth.stopAutoRefresh();
+      appStateSubscription?.remove();
+      if (Platform.OS !== "web") supabase.auth.stopAutoRefresh();
     };
   }, []);
 
