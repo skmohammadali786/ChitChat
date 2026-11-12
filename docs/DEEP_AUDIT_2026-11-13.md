@@ -103,6 +103,16 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 - CI: Failing before steps; unverified.
 - Security review: Missing independent protocol review and threat-model sign-off.
 
+## Follow-up implementation after the audit
+
+- Added per-user conversation preference loading and safe partial updates that preserve other preference columns.
+- Added long-press actions for pinning, muting for eight hours, and archiving conversations.
+- Pinned conversations sort first. Archived conversations are available in a dedicated inbox view and can be restored.
+- Added notification privacy controls for alerts off or sender-only. Message text is intentionally never included in push payloads.
+- Updated and redeployed `notify-message` as version 3. It now suppresses push delivery for muted conversations and disabled notification preferences. JWT verification remains enabled.
+- Verified Supabase RLS policies exist for conversation preferences, user settings and push devices. The Supabase security advisor returned no lints.
+- These additions are implemented in source and backend deployment, but authenticated multi-user/device acceptance tests remain outstanding.
+
 ## Required implementation order
 
 1. Stabilize the build: add a committed lockfile, fix CI runner/workflow setup, and get TypeScript, Expo Doctor, Rust tests, fmt, and Clippy to execute.
