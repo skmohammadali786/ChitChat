@@ -77,6 +77,9 @@ class SecureSessionStorage implements SessionStorage {
       chunks.push(value.slice(offset, offset + this.chunkSize));
     }
     if (chunks.length === 0) chunks.push("");
+    if (chunks.length > 64) {
+      throw new Error("The stored authentication session exceeded the secure storage limit.");
+    }
 
     try {
       await Promise.all(
