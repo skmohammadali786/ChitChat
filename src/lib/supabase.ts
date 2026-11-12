@@ -73,8 +73,15 @@ class SecureSessionStorage implements SessionStorage {
     const previous = await this.readManifest(key);
     const prefix = `${base}.${Date.now()}.${Math.random().toString(36).slice(2, 9)}`;
     const chunks: string[] = [];
-    for (let offset = 0; offset < value.length; offset += this.chunkSize) {
-      chunks.push(value.slice(offset, offset + this.chunkSize));
+    for (let offset = 0; offset < value.length;) {
+      let end = Math.min(offset + this.chunkSize, value.length);
+      const lastUnit = value.charCodeAt(end - 1);
+      const nextUnit = end < value.length ? value.charCodeAt(end) : -1;
+      const endsWithHighSurrogate = lastUnit >= 0xd800 && lastUnit <= 0xdbff;
+      const beginsWithLowSurrogate = nextUnit >= 0xdc00 && nextUnit <= 0xdfff;
+      if (endsWithHighSurrogate && beginsWithLowSurrogate) end -= 1;
+      chunks.push(value.slice(offset, end));
+      offset = end;
     }
     if (chunks.length === 0) chunks.push("");
     if (chunks.length > 64) {
