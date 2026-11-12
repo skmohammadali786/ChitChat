@@ -1,0 +1,59 @@
+import { supabase } from "../../lib/supabase";
+
+export type PresenceMember = {
+  user_id: string;
+  online: boolean;
+  typing: boolean;
+  last_active_at: string;
+};
+
+export function subscribeToConversationPresence(
+  conversationId: string,
+  userId: string,
+  onPresence: (members: Record<string, PresenceMember[]>) => void,
+  onTyping: (payload: { userId: string; typing: boolean }) => void,
+) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const channel = supabase.channel(`presence:${conversationId}`, {
+    config: { presence: { key: userId }, broadcast: { self: false } },
+  });
+
+  channel
+    .on("presence", { event: "sync" }, () => onPresence(channel.presenceState() as Record<string, PresenceMember[]>))
+    .on("broadcast", { event: "typing" }, ({ payload }) => {
+      const value = payload as { userId?: string; typing?: boolean };
+      if (value.userId && typeof value.typing === "boolean" && value.userId !== userId) {
+        onTyping({ userId: value.userId, typing: value.typing });
+      }
+    })
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        void channel.track({
+          user_id: userId,
+          online: true,
+          typing: false,
+          last_active_at: new Date().toISOString(),
+        } satisfies PresenceMember);
+      }
+    });
+
+  return {
+    async setTyping(typing: boolean) {
+      await channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { userId, typing },
+      });
+      await channel.track({
+        user_id: userId,
+        online: true,
+        typing,
+        last_active_at: new Date().toISOString(),
+      } satisfies PresenceMember);
+    },
+    async stop() {
+      await channel.untrack();
+      if (supabase) await supabase.removeChannel(channel);
+    },
+  };
+}
