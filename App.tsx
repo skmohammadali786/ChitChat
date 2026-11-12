@@ -10,6 +10,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./src/features/auth/AuthScreen";
 import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
+import { EditProfileScreen } from "./src/features/auth/EditProfileScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
@@ -35,12 +36,13 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void }) {
+function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
@@ -182,6 +184,22 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
       <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <BlockedUsersScreen onBack={() => setShowBlockedUsers(false)} />
+      </SafeAreaView>
+    );
+  }
+
+  if (showProfileEditor && profile) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <EditProfileScreen
+          profile={profile}
+          onBack={() => setShowProfileEditor(false)}
+          onSaved={updated => {
+            onProfileUpdated?.(updated);
+            setShowProfileEditor(false);
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -376,11 +394,14 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           {discoveryError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{discoveryError}</Text> : null}
           {profile ? (
             <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.xl }]}>
-              <Avatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.settingTitle, { color: c.text }]}>{profile.display_name}</Text>
-                <Text style={[styles.settingHint, { color: c.muted }]}>@{profile.username}</Text>
-              </View>
+              <Pressable accessibilityRole="button" onPress={() => setShowProfileEditor(true)} style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                <Avatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.settingTitle, { color: c.text }]}>{profile.display_name}</Text>
+                  <Text style={[styles.settingHint, { color: c.muted }]}>@{profile.username}</Text>
+                  <Text style={{ color: palette.brand, fontSize: 10, fontWeight: "800", marginTop: 5 }}>Edit profile</Text>
+                </View>
+              </Pressable>
               {onSignOut ? (
                 <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 8 }}>
                   <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign out</Text>
@@ -631,5 +652,5 @@ export default function App() {
   if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
-  return <MainApp profile={profile} onSignOut={() => { void signOut(); }} />;
+  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} />;
 }
