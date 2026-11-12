@@ -499,6 +499,10 @@ export default function App() {
       if (error) console.warn("ChitChat could not restore the auth session.", error);
       setSession(data.session);
       setAuthReady(true);
+    }).catch(error => {
+      if (!mounted) return;
+      console.warn("ChitChat could not restore the auth session.", error);
+      setAuthReady(true);
     });
 
     void Linking.getInitialURL().then(url => {
@@ -554,10 +558,11 @@ export default function App() {
 
   if (!isSupabaseConfigured) return <MainApp profile={null} />;
   if (demoMode) return <MainApp profile={null} onExitDemo={() => setDemoMode(false)} />;
-  if (!authReady || profileLoading) return <AppBootScreen />;
+  if (!authReady) return <AppBootScreen />;
   if (passwordRecovery && session?.user) {
     return <PasswordRecoveryScreen onDone={() => { void signOut(); }} />;
   }
+  if (profileLoading) return <AppBootScreen />;
   if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
