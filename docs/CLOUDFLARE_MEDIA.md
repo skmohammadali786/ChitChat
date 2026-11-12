@@ -25,6 +25,8 @@ Supabase remains the identity, authorization, metadata, and realtime control pla
 - `DELETE /v1/media/:mediaId`
   - Only the owner can delete an object.
 
+The private R2 bucket's managed public r2.dev domain is explicitly disabled. The app reaches objects only through the authenticated Worker endpoint above. Supabase stores media IDs, ownership, conversation scope, byte size, ciphertext digest, and crypto version. It never stores the binary media.
+
 The app must encrypt media locally through the Rust crypto layer before upload and verify
 the SHA-256 digest after download. The current Rust crate does not yet implement this
 encryption or hashing flow. The upload API therefore must not be enabled in the UI until
