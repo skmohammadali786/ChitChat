@@ -33,7 +33,7 @@ export function BlockedUsersScreen({ onBack }: Props) {
     setError("");
     try {
       await unblockUser(id);
-      setItems(old => old.filter(item => item.blocked_user_id !== id));
+      setItems(old => old.filter(item => item.blocked_id !== id));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not unblock this account.");
     } finally {
@@ -68,7 +68,7 @@ export function BlockedUsersScreen({ onBack }: Props) {
             const displayName = item.display_name || item.username || "ChitChat member";
             const initials = displayName.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "CH";
             return (
-              <View key={item.blocked_user_id} style={styles.row}>
+              <View key={item.blocked_id} style={styles.row}>
                 <Avatar initials={initials} color="#D8D1FF" size={46} />
                 <View style={styles.copy}>
                   <Text style={styles.name}>{displayName}</Text>
@@ -76,11 +76,11 @@ export function BlockedUsersScreen({ onBack }: Props) {
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  disabled={busyId === item.blocked_user_id}
-                  onPress={() => { void unblock(item.blocked_user_id); }}
-                  style={[styles.unblock, busyId === item.blocked_user_id && { opacity: 0.55 }]}
+                  disabled={busyId === item.blocked_id}
+                  onPress={() => { void unblock(item.blocked_id); }}
+                  style={[styles.unblock, busyId === item.blocked_id && { opacity: 0.55 }]}
                 >
-                  {busyId === item.blocked_user_id
+                  {busyId === item.blocked_id
                     ? <ActivityIndicator size="small" color={palette.brand} />
                     : <Text style={styles.unblockText}>Unblock</Text>}
                 </Pressable>
