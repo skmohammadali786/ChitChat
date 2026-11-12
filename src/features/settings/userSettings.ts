@@ -62,9 +62,11 @@ export async function loadUserSettings(): Promise<UserSettings> {
 
 export async function saveUserSettings(changes: Partial<Omit<UserSettings, "user_id" | "updated_at">>): Promise<UserSettings> {
   const userId = await currentUserId();
+  await loadUserSettings();
   const { data, error } = await client()
     .from("user_settings")
-    .upsert({ user_id: userId, ...changes, updated_at: new Date().toISOString() }, { onConflict: "user_id" })
+    .update({ ...changes, updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
     .select("*")
     .single();
   if (error) throw error;
