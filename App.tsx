@@ -14,6 +14,7 @@ import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
+import { loadPreferences, savePreference } from "./src/lib/preferences";
 
 type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; conversationId?: string; remoteUserId?: string };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
@@ -46,6 +47,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   const [messages, setMessages] = useState<Message[]>(seedMessages);
   const [dark, setDark] = useState(false);
   const [autoReveal, setAutoReveal] = useState(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
     text: palette.darkText, muted: palette.darkMuted, line: palette.darkLine
@@ -53,6 +55,37 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
     bg: palette.paper, surface: palette.white, raised: "#F0F1F5",
     text: palette.ink, muted: palette.muted, line: palette.line
   };
+
+  useEffect(() => {
+    let active = true;
+    void loadPreferences()
+      .then(saved => {
+        if (!active) return;
+        setDark(saved.dark);
+        setAutoReveal(saved.autoReveal);
+      })
+      .catch(error => console.warn("Could not load ChitChat preferences.", error))
+      .finally(() => {
+        if (active) setPreferencesReady(true);
+      });
+    return () => { active = false; };
+  }, []);
+
+  function toggleDarkAppearance() {
+    const next = !dark;
+    setDark(next);
+    void savePreference("appearance.dark", next).catch(error => {
+      console.warn("Could not save appearance preference.", error);
+    });
+  }
+
+  function toggleAutoReveal() {
+    const next = !autoReveal;
+    setAutoReveal(next);
+    void savePreference("messages.autoReveal", next).catch(error => {
+      console.warn("Could not save secret reveal preference.", error);
+    });
+  }
 
   const filteredChats = useMemo(() => chats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [chats, search]);
 
@@ -316,11 +349,11 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           <Text style={[styles.sectionTitle, { color: c.text, marginBottom: spacing.lg }]}>Your experience</Text>
           <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Dark appearance</Text><Text style={[styles.settingHint, { color: c.muted }]}>Use a darker color palette</Text></View>
-            <Pressable onPress={() => setDark(!dark)} style={[styles.toggle, dark && styles.toggleOn]}><View style={[styles.toggleKnob, dark && styles.toggleKnobOn]} /></Pressable>
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: dark, disabled: !preferencesReady }} disabled={!preferencesReady} onPress={toggleDarkAppearance} style={[styles.toggle, dark && styles.toggleOn, !preferencesReady && { opacity: 0.55 }]}><View style={[styles.toggleKnob, dark && styles.toggleKnobOn]} /></Pressable>
           </View>
           <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Auto-reveal secrets</Text><Text style={[styles.settingHint, { color: c.muted }]}>Reveal received secret messages automatically</Text></View>
-            <Pressable onPress={() => setAutoReveal(!autoReveal)} style={[styles.toggle, autoReveal && styles.toggleOn]}><View style={[styles.toggleKnob, autoReveal && styles.toggleKnobOn]} /></Pressable>
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: autoReveal, disabled: !preferencesReady }} disabled={!preferencesReady} onPress={toggleAutoReveal} style={[styles.toggle, autoReveal && styles.toggleOn, !preferencesReady && { opacity: 0.55 }]}><View style={[styles.toggleKnob, autoReveal && styles.toggleKnobOn]} /></Pressable>
           </View>
           <View style={[styles.infoCard, { backgroundColor: dark ? "#282342" : "#EEEAFE" }]}>
             <Text style={{ color: palette.brand, fontWeight: "800", fontSize: 15 }}>Your privacy, your rules.</Text>
