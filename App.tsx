@@ -18,6 +18,7 @@ import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference } from "./src/lib/preferences";
+import { loadUserSettings, saveUserSettings } from "./src/features/settings/userSettings";
 
 type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; conversationId?: string; remoteUserId?: string };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
@@ -55,6 +56,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [dark, setDark] = useState(false);
   const [autoReveal, setAutoReveal] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const [showReadReceipts, setShowReadReceipts] = useState(true);
+  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  const [showTypingStatus, setShowTypingStatus] = useState(true);
+  const [settingsError, setSettingsError] = useState("");
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
     text: palette.darkText, muted: palette.darkMuted, line: palette.darkLine
@@ -84,6 +89,12 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     void savePreference("appearance.dark", next).catch(error => {
       console.warn("Could not save appearance preference.", error);
     });
+    if (profile) {
+      void saveUserSettings({ theme: next ? "dark" : "light" }).catch(error => {
+        setDark(!next);
+        setSettingsError(error instanceof Error ? error.message : "Could not save appearance setting.");
+      });
+    }
   }
 
   function toggleAutoReveal() {
@@ -92,9 +103,56 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     void savePreference("messages.autoReveal", next).catch(error => {
       console.warn("Could not save secret reveal preference.", error);
     });
+    if (profile) {
+      void saveUserSettings({ auto_reveal_secrets: next }).catch(error => {
+        setAutoReveal(!next);
+        setSettingsError(error instanceof Error ? error.message : "Could not save secret reveal setting.");
+      });
+    }
+  }
+
+  async function updatePrivacySetting(
+    key: "show_read_receipts" | "show_online_status" | "show_typing_status",
+    next: boolean,
+  ) {
+    setSettingsError("");
+    const setter = key === "show_read_receipts"
+      ? setShowReadReceipts
+      : key === "show_online_status"
+        ? setShowOnlineStatus
+        : setShowTypingStatus;
+    const current = key === "show_read_receipts"
+      ? showReadReceipts
+      : key === "show_online_status"
+        ? showOnlineStatus
+        : showTypingStatus;
+    setter(next);
+    if (!profile) return;
+    try {
+      await saveUserSettings({ [key]: next });
+    } catch (error) {
+      setter(current);
+      setSettingsError(error instanceof Error ? error.message : "Could not save privacy setting.");
+    }
   }
 
   const filteredChats = useMemo(() => chats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+
+  useEffect(() => {
+    if (!profile || !supabase) return;
+    let active = true;
+    void loadUserSettings().then(saved => {
+      if (!active) return;
+      setDark(saved.theme === "dark");
+      setAutoReveal(saved.auto_reveal_secrets);
+      setShowReadReceipts(saved.show_read_receipts);
+      setShowOnlineStatus(saved.show_online_status);
+      setShowTypingStatus(saved.show_typing_status);
+    }).catch(error => {
+      if (active) setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
+    });
+    return () => { active = false; };
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!profile || !supabase) return;
@@ -476,6 +534,24 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Auto-reveal secrets</Text><Text style={[styles.settingHint, { color: c.muted }]}>Reveal received secret messages automatically</Text></View>
             <Pressable accessibilityRole="switch" accessibilityState={{ checked: autoReveal, disabled: !preferencesReady }} disabled={!preferencesReady} onPress={toggleAutoReveal} style={[styles.toggle, autoReveal && styles.toggleOn, !preferencesReady && { opacity: 0.55 }]}><View style={[styles.toggleKnob, autoReveal && styles.toggleKnobOn]} /></Pressable>
           </View>
+          {profile ? (
+            <>
+              <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>Privacy controls</Text>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Read receipts</Text><Text style={[styles.settingHint, { color: c.muted }]}>Let people know when you have read their messages.</Text></View>
+                <Pressable accessibilityRole="switch" accessibilityState={{ checked: showReadReceipts }} onPress={() => void updatePrivacySetting("show_read_receipts", !showReadReceipts)} style={[styles.toggle, showReadReceipts && styles.toggleOn]}><View style={[styles.toggleKnob, showReadReceipts && styles.toggleKnobOn]} /></Pressable>
+              </View>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Online status</Text><Text style={[styles.settingHint, { color: c.muted }]}>Share when you are active in ChitChat.</Text></View>
+                <Pressable accessibilityRole="switch" accessibilityState={{ checked: showOnlineStatus }} onPress={() => void updatePrivacySetting("show_online_status", !showOnlineStatus)} style={[styles.toggle, showOnlineStatus && styles.toggleOn]}><View style={[styles.toggleKnob, showOnlineStatus && styles.toggleKnobOn]} /></Pressable>
+              </View>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Typing indicator</Text><Text style={[styles.settingHint, { color: c.muted }]}>Share when you are typing in a conversation.</Text></View>
+                <Pressable accessibilityRole="switch" accessibilityState={{ checked: showTypingStatus }} onPress={() => void updatePrivacySetting("show_typing_status", !showTypingStatus)} style={[styles.toggle, showTypingStatus && styles.toggleOn]}><View style={[styles.toggleKnob, showTypingStatus && styles.toggleKnobOn]} /></Pressable>
+              </View>
+            </>
+          ) : null}
+          {settingsError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{settingsError}</Text> : null}
           <View style={[styles.infoCard, { backgroundColor: dark ? "#282342" : "#EEEAFE" }]}>
             <Text style={{ color: palette.brand, fontWeight: "800", fontSize: 15 }}>Your privacy, your rules.</Text>
             <Text style={{ color: dark ? "#D8D0FF" : "#6559A6", lineHeight: 20, marginTop: 7, fontSize: 13 }}>Choose how secret messages appear. You can reveal them when you're ready, then hide them again.</Text>
