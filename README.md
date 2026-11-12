@@ -4,6 +4,7 @@ ChitChat is an Android-first, privacy-focused messaging app. Its signature featu
 
 ## Stack
 - Expo SDK 58, React Native 0.88, React 19.3, TypeScript
+- Rust domain-validation workspace, with native bridge implementation still pending
 - Supabase Auth, Postgres, and Realtime foundations
 - Astryx-informed in-house design conventions, without importing Astryx as a runtime dependency
 
@@ -44,3 +45,4 @@ See [security decisions](docs/SECURITY_DECISIONS.md) for protocol evaluation and
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Android build guide](docs/ANDROID_BUILDS.md)
+- [Rust architecture](docs/RUST_ARCHITECTURE.md)
