@@ -52,18 +52,18 @@ security definer
 set search_path = ''
 as $
 declare
-  requester_id uuid := auth.uid();
-  normalized_username text := lower(trim(search_username));
-  recent_searches integer;
+  v_requester_id uuid := auth.uid();
+  v_normalized_username text := lower(trim(search_username));
+  v_recent_searches integer;
 begin
-  if requester_id is null then
+  if v_requester_id is null then
     raise exception 'Authentication required' using errcode = '28000';
   end if;
 
-  if normalized_username is null
-     or char_length(normalized_username) < 3
-     or char_length(normalized_username) > 20
-     or normalized_username !~ '^[a-z0-9_]+
+  if v_normalized_username is null
+     or char_length(v_normalized_username) < 3
+     or char_length(v_normalized_username) > 20
+     or v_normalized_username !~ '^[a-z0-9_]+
 
 alter table public.profiles enable row level security;
 
@@ -97,32 +97,32 @@ create policy "profiles_update_own"
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended(requester_id::text, 1)
+    pg_catalog.hashtextextended(v_requester_id::text, 1)
   );
 
   delete from private.profile_search_events
-   where profile_search_events.requester_id = lookup_profile_by_username.requester_id
+   where profile_search_events.requester_id = v_requester_id
      and profile_search_events.searched_at < now() - interval '1 minute';
 
   select pg_catalog.count(*)::integer
-    into recent_searches
+    into v_recent_searches
   from private.profile_search_events as search_event
-  where search_event.requester_id = requester_id;
+  where search_event.requester_id = v_requester_id;
 
-  if recent_searches >= 20 then
+  if v_recent_searches >= 20 then
     raise exception 'Too many username lookups. Try again in a minute.'
       using errcode = 'P0001';
   end if;
 
   insert into private.profile_search_events (requester_id)
-  values (requester_id);
+  values (v_requester_id);
 
   return query
     select profile_row.id, profile_row.username, profile_row.display_name, profile_row.avatar_url
     from public.profiles as profile_row
-    where lower(profile_row.username) = normalized_username
+    where lower(profile_row.username) = v_normalized_username
       and profile_row.discoverable = true
-      and profile_row.id <> requester_id
+      and profile_row.id <> v_requester_id
     limit 1;
 end;
 $;
