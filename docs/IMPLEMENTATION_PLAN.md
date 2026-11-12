@@ -15,8 +15,8 @@
 - Demo mode remains available while backend configuration is missing.
 
 ## Phase 2: connect and verify backend
-- Create a dedicated ChitChat Supabase project and configure app environment variables.
-- Run the profile and messaging setup SQL in order.
+- Supabase project created, core migrations applied, and app environment variables documented.
+- Profile, messaging, group, privacy, scheduling and media metadata migrations applied and security advisors checked.
 - Verify email confirmation and password recovery deep links on Android and iOS.
 - Verify username discovery opt-out, exact lookup, rate limiting, and RLS behavior.
 - Verify direct conversation creation is idempotent and only members can list/read it.
@@ -28,8 +28,8 @@
 - Add device credentials, key-package publication, device verification and encrypted local MLS state.
 - Replace the generic message nonce envelope with validated MLS wire-format metadata.
 - Add cross-platform direct and group messaging vectors before enabling the composer.
-- Select and integrate a reviewed protocol/library that supports Android, iOS, React Native 0.88, and Hermes.
-- Device identity keys, prekeys, key changes, verification, recovery, and multi-device strategy.
+- Validate OpenMLS 0.9.2 on Android/iOS, React Native 0.88 and Hermes. Add UniFFI bindings and cross-platform tests.
+- Device credentials, key-package lifecycle, epoch changes, verification, recovery, and multi-device strategy.
 - Define encrypted attachments, secret-message payload format, expiry, and local cache lifecycle.
 - Fail closed. Never send plaintext if encryption is unavailable.
 - Threat model and independent security review before public E2EE claims.
