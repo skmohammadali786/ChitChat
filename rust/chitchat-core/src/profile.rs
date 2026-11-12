@@ -13,7 +13,9 @@ pub struct ProfileDraft {
 pub fn validate_profile(profile: &ProfileDraft) -> CoreResult<()> {
     let username = profile.username.trim();
     if !(3..=20).contains(&username.len())
-        || !username.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+        || !username.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+        })
     {
         return Err(CoreError::InvalidUsername);
     }
