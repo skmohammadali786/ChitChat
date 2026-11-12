@@ -55,22 +55,32 @@ Deno.serve(
         { data: settings, error: settingsError },
         { data: devices, error: devicesError },
         { data: conversationSettings, error: conversationSettingsError },
+        { data: senderBlocks, error: senderBlocksError },
+        { data: recipientBlocks, error: recipientBlocksError },
       ] = await Promise.all([
         admin.from("user_settings").select("user_id,notification_preview").in("user_id", recipientIds),
         admin.from("push_devices").select("id,user_id,expo_push_token").in("user_id", recipientIds).is("revoked_at", null),
         admin.from("conversation_user_settings").select("user_id,muted_until")
           .eq("conversation_id", message.conversation_id).in("user_id", recipientIds),
+        admin.from("user_blocks").select("blocked_id").eq("blocker_id", senderId).in("blocked_id", recipientIds),
+        admin.from("user_blocks").select("blocker_id").eq("blocked_id", senderId).in("blocker_id", recipientIds),
       ]);
       if (settingsError) throw settingsError;
       if (devicesError) throw devicesError;
       if (conversationSettingsError) throw conversationSettingsError;
+      if (senderBlocksError) throw senderBlocksError;
+      if (recipientBlocksError) throw recipientBlocksError;
 
       const previewByUser = new Map((settings ?? []).map(row => [row.user_id, row.notification_preview]));
       const muteByUser = new Map((conversationSettings ?? []).map(row => [row.user_id, row.muted_until]));
+      const blockedRecipientIds = new Set([
+        ...(senderBlocks ?? []).map(row => row.blocked_id),
+        ...(recipientBlocks ?? []).map(row => row.blocker_id),
+      ]);
       const allowedRecipients = new Set(recipientIds.filter(id => {
         const mutedUntil = muteByUser.get(id);
         const isMuted = typeof mutedUntil === "string" && new Date(mutedUntil).getTime() > Date.now();
-        return previewByUser.get(id) !== "none" && !isMuted;
+        return previewByUser.get(id) !== "none" && !isMuted && !blockedRecipientIds.has(id);
       }));
       const { data: senderProfile, error: senderProfileError } = await admin
         .from("profiles")
