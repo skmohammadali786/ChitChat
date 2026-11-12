@@ -12,6 +12,7 @@ import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScre
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
 import { EditProfileScreen } from "./src/features/auth/EditProfileScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
+import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
@@ -41,6 +42,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
@@ -198,6 +200,34 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           onSaved={updated => {
             onProfileUpdated?.(updated);
             setShowProfileEditor(false);
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (showGroupCreation) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <GroupCreationScreen
+          onBack={() => setShowGroupCreation(false)}
+          onCreated={(conversationId, title) => {
+            const initials = title.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+            const newChat: Chat = {
+              id: conversationId,
+              name: title,
+              initials: initials || "GR",
+              color: "#D8D1FF",
+              message: "Group created",
+              time: "now",
+              unread: 0,
+              isReal: true,
+              conversationId,
+            };
+            setChats(old => [newChat, ...old.filter(chat => chat.conversationId !== conversationId)]);
+            setActiveChat(newChat);
+            setShowGroupCreation(false);
           }}
         />
       </SafeAreaView>
@@ -419,6 +449,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
               ) : null}
             </View>
           )}
+          {profile ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowGroupCreation(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Create a group</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Start a group conversation with discoverable users.</Text>
+              </View>
+              <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
+            </Pressable>
+          ) : null}
           {profile ? (
             <Pressable accessibilityRole="button" onPress={() => setShowBlockedUsers(true)} style={[styles.settingCard, { backgroundColor: c.surface }]}>
               <View style={styles.settingCopy}>
