@@ -1,35 +1,63 @@
 # ChitChat build and integration status
 
-## Configured
-- Rust core now defines a versioned structured message payload with Unicode text, concealed segments, and encrypted-media references. Validation tests cover emoji, concealed text, and media metadata. These tests have been authored but not yet executed in CI.
-- Deployed authenticated Supabase Edge Function `notify-message` with JWT verification. It sends generic Expo push alerts only, checks message ownership and conversation recipients, honors notification-preview opt-out and revokes unregistered Expo tokens.
-- Settings UI can request notification permission and register Expo push tokens. It requires `EXPO_PUBLIC_EAS_PROJECT_ID`, which must be filled after linking the Expo project.\n- Private Cloudflare R2 bucket `chitchat-media` in APAC Standard storage.\n- Deployed `chitchat-media-api` Worker with an R2 binding and Supabase JWT verification.\n- Public `r2.dev` access is disabled; unauthenticated Worker requests return an authentication error.\n- Supabase `media_objects` metadata table with RLS and crypto-version metadata.
-- Group create/list/add/remove/rename/transfer-owner RPCs with server-side membership and role checks.
-- Per-recipient delivery/read receipt rows, message-insert trigger, privacy-aware read RPCs and Realtime publication.
-- User privacy/theme settings, per-conversation pin/mute/archive settings and push-device token registry.
-- Encrypted scheduled-message envelope table and a verified `pg_cron` job that dispatches due rows once per minute.
-- Private Realtime authorization policies for conversation channels, including online and typing privacy controls.
-- Dedicated Supabase project URL and publishable client key.
-- Expo Android and iOS identifiers and deep-link scheme.
-- Rust workspace and platform-independent domain crate.
-- Separate CI jobs for TypeScript/Expo and Rust tests.
-- Rust bridge contract and fail-closed messaging guard.
+Last audited: 2026-11-13
+Branch: `feat/rust-native-supabase`
+PR #1 remains draft. Do not merge.
 
-## Not yet complete
-- Group, receipts, settings, scheduled-message and push-device client services are present but are not yet fully wired into the screen UI.
-- Scheduled messages are inserted by the database scheduler, but end-user scheduling and delivery flows still need Android/iOS integration tests.
-- Push notifications have token registration only. No push-delivery Edge Function is deployed.
-- Android JNI/UniFFI bridge implementation.
-- iOS Swift/UniFFI bridge implementation.
-- Native development builds for both platforms.
-- A reviewed end-to-end encryption protocol and device-key lifecycle.
-- Message encryption and decryption adapter.
-- Integration tests with real authenticated users on Android and iOS.
+## Configured foundations
 
-## Honest release gate
-The project must not be described as complete or end-to-end encrypted until the above steps pass on actual Android and iOS device builds. The R2 API accepts ciphertext bytes and records a client-supplied digest and crypto version, but the current Rust crate does not yet encrypt or decrypt those bytes. The database currently stores ciphertext envelopes only. The current Rust crate checks envelope structure but does not encrypt or decrypt content.
+- Expo React Native application shell, Supabase Auth/profile flows, profile editing and deep-link handlers.
+- Rust workspace with profile/envelope validation and a versioned structured message-content model for Unicode text, concealed segments and encrypted-media references. Tests are authored but have not run successfully in CI.
+- Supabase project and migrations for profiles, conversations, groups, messages, device records, blocks, reports, media metadata, receipts, settings, push devices and scheduled messages.
+- Supabase security and health advisors previously returned no lints. This does not replace authenticated multi-user integration tests.
+- Group create/list/add/remove/rename/leave/owner-transfer RPCs and management screens.
+- User-scoped theme, auto-reveal, read-receipt, online, typing and last-seen preferences.
+- Private Realtime authorization and an active-conversation presence/typing subscription in the app.
+- Per-recipient delivery/read receipt records and RPCs. The active chat UI does not yet load messages or display receipt state.
+- Scheduled-message envelope storage and a pg_cron dispatcher. End-user scheduling UI and end-to-end delivery tests are incomplete.
+- Private Cloudflare R2 bucket `chitchat-media`, with public `r2.dev` access disabled.
+- Deployed `chitchat-media-api` Worker with an R2 binding and Supabase session/conversation-membership checks. Unauthenticated access was rejected. Authenticated device upload/download tests remain.
+- Supabase `media_objects` metadata with RLS, digest and crypto-version fields.
+- Authenticated Supabase Edge Function `notify-message` with JWT verification. It checks message ownership and conversation recipients, sends generic Expo alerts without plaintext or keys, honors `notification_preview = none`, and revokes tokens reported as unregistered.
+- Client push permission/token registration UI and sign-out token-revocation attempt. `EXPO_PUBLIC_EAS_PROJECT_ID`, EAS credentials and real-device delivery remain unconfigured/unverified.
+- Expo Android/iOS identifiers, EAS build profiles and CI workflow definitions.
 
-## Build commands
+## Verified limitations
+
+- Real authenticated conversations are created/listed, but the active real-chat screen is a placeholder. It does not load message history or subscribe to new message records.
+- The real-chat composer is disabled. The local composer only appends demo messages to in-memory state.
+- OpenMLS 0.9.2 is selected in an ADR but is not integrated. There is no working MLS encryption/decryption, key-package lifecycle, device verification, recovery, or multi-device support.
+- `src/native/chitchatCore.ts` defines a React Native module contract, but Android and iOS native implementations are absent.
+- The message service still uses the legacy nonce-based envelope. A migration to MLS wire metadata is required before MLS messaging can be enabled.
+- Media encryption/decryption and the picker-to-R2-to-decrypt UI flow are absent. The Worker and metadata schema do not encrypt files.
+- Group management exists, but encrypted group messaging, MLS membership commits and key rotation are absent.
+- Receipt and reaction backend services are not integrated into an active message UI.
+- Calls are a placeholder. Voice/video calling is not implemented.
+- Offline outbox, disappearing messages, encrypted search, replies, forwarding and complete message actions are absent.
+- App lock and biometric enforcement are not implemented. Settings fields alone do not provide these controls.
+- External secret-link endpoints/reveal page and subscription purchase/restore flows are not implemented.
+- System theme, accent palette picker, complete reduced-motion behavior and systematic accessibility tests are incomplete.
+- No committed `package-lock.json` exists. Current CI uses `npm install`, so dependency resolution is not reproducible.
+- Latest recorded GitHub Actions run failed before any job steps were reported. TypeScript, Expo Doctor, Rust tests, rustfmt and Clippy have not been verified.
+- No Android or iOS development/release build has been tested on a device. No Android↔iOS exchange has passed.
+
+## Security and release rule
+
+Do not describe ChitChat as end-to-end encrypted or enable real message sending until the OpenMLS engine, protected local state, native bridges, device lifecycle, envelope migration, media encryption and cross-platform tests pass. Keep real message sending fail-closed.
+
+Do not merge PR #1 or treat an APK as a complete release until:
+1. A reproducible lockfile is committed.
+2. CI actually executes and passes TypeScript, Expo Doctor, Rust tests, formatting and Clippy.
+3. Android and iOS native builds link the same Rust protocol engine.
+4. Authenticated multi-user backend tests pass.
+5. Android-to-iOS and iOS-to-Android encrypted exchanges pass.
+6. Media, group membership changes, notifications, receipts, offline retry and privacy controls pass acceptance tests.
+7. Threat model and independent security review are complete.
+
+Termux can initiate an EAS Android cloud build. It cannot locally build iOS without macOS/Xcode.
+
+## Commands used by CI
+
 ```bash
 npm install
 npx expo install --check
@@ -39,3 +67,5 @@ cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by-feature inventory and implementation order.
