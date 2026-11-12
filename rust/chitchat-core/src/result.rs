@@ -30,4 +30,10 @@ pub enum CoreError {
     /// The provided envelope contains an unsupported or malformed value.
     #[error("Message envelope contains unsupported values.")]
     InvalidEnvelope,
+    /// The application message content has an unsupported or malformed structure.
+    #[error("Message content is empty, too large, or uses an unsupported version.")]
+    InvalidMessageContent,
+    /// A media reference contains invalid encryption metadata.
+    #[error("Encrypted media metadata is invalid.")]
+    InvalidMediaAttachment,
 }
