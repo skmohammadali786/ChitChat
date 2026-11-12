@@ -281,6 +281,11 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           conversationId={activeChat.conversationId}
           initialTitle={activeChat.name}
           onBack={() => setShowGroupManagement(false)}
+          onLeft={() => {
+            setShowGroupManagement(false);
+            setActiveChat(null);
+            setChats(current => current.filter(chat => chat.conversationId !== activeChat.conversationId));
+          }}
           onRenamed={title => {
             setActiveChat(current => current ? { ...current, name: title } : current);
             setChats(current => current.map(chat => chat.conversationId === activeChat.conversationId ? { ...chat, name: title } : chat));
