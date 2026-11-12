@@ -30,7 +30,11 @@ alter table public.profiles enable row level security;
 -- authenticated RPC below, not by granting broad table SELECT access.
 revoke all on table public.profiles from anon, public;
 grant usage on schema public to authenticated;
-grant select, insert, update on table public.profiles to authenticated;
+grant select on table public.profiles to authenticated;
+grant insert (id, username, display_name, bio, avatar_url, discoverable)
+  on table public.profiles to authenticated;
+grant update (id, username, display_name, bio, avatar_url, discoverable)
+  on table public.profiles to authenticated;
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
