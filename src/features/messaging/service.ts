@@ -53,6 +53,25 @@ function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
 }
 
 
+
+export type ConversationSummary = {
+  conversation_id: string;
+  conversation_kind: "direct" | "group";
+  conversation_title: string | null;
+  updated_at: string;
+  other_user_id: string | null;
+  other_username: string | null;
+  other_display_name: string | null;
+  other_avatar_url: string | null;
+};
+
+export async function loadMyConversations(): Promise<ConversationSummary[]> {
+  const client = requireClient();
+  const { data, error } = await client.rpc("list_my_conversations");
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as ConversationSummary[];
+}
+
 export type DiscoverableProfile = {
   id: string;
   username: string;
