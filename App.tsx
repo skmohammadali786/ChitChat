@@ -129,7 +129,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     setter(next);
     if (!profile) return;
     try {
-      await saveUserSettings({ [key]: next });
+      await saveUserSettings(
+        key === "show_read_receipts"
+          ? { show_read_receipts: next }
+          : key === "show_online_status"
+            ? { show_online_status: next }
+            : { show_typing_status: next },
+      );
     } catch (error) {
       setter(current);
       setSettingsError(error instanceof Error ? error.message : "Could not save privacy setting.");
