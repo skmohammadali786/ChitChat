@@ -109,6 +109,7 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 - Added long-press actions for pinning, muting for eight hours, and archiving conversations.
 - Pinned conversations sort first. Archived conversations are available in a dedicated inbox view and can be restored.
 - Added notification privacy controls for alerts off or sender-only. Message text is intentionally never included in push payloads.
+- Added push notification tap routing. The app reads the notification response, opens the matching conversation after the inbox loads, and clears the consumed response.
 - Updated and redeployed `notify-message` as version 3. It now suppresses push delivery for muted conversations and disabled notification preferences. JWT verification remains enabled.
 - Verified Supabase RLS policies exist for conversation preferences, user settings and push devices. The Supabase security advisor returned no lints.
 - These additions are implemented in source and backend deployment, but authenticated multi-user/device acceptance tests remain outstanding.
