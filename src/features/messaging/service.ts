@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { chitchatCore } from "../../native/chitchatCore";
 
 export type EncryptedMessageType = "text" | "image" | "video" | "audio" | "file";
 
@@ -172,6 +173,7 @@ export async function sendEncryptedMessage(
   envelope: EncryptedMessageEnvelope
 ): Promise<EncryptedMessageRecord> {
   validateEnvelope(envelope);
+  if (chitchatCore.available) await chitchatCore.validateEnvelope(envelope);
   const client = requireClient();
   const { data: { user }, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
