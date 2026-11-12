@@ -83,6 +83,16 @@ export type ConversationSettings = {
   updated_at: string;
 };
 
+export async function loadConversationSettings(): Promise<ConversationSettings[]> {
+  const userId = await currentUserId();
+  const { data, error } = await client()
+    .from("conversation_user_settings")
+    .select("conversation_id, user_id, pinned_at, muted_until, archived_at, hidden_at, updated_at")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return (data ?? []) as ConversationSettings[];
+}
+
 export async function saveConversationSettings(
   conversationId: string,
   changes: Partial<Pick<ConversationSettings, "pinned_at" | "muted_until" | "archived_at" | "hidden_at">>,
