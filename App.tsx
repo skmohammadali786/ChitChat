@@ -20,6 +20,7 @@ import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference } from "./src/lib/preferences";
 import { loadUserSettings, saveUserSettings } from "./src/features/settings/userSettings";
+import { disablePushNotifications, enablePushNotifications, listenForPushTokenChanges, revokeCurrentPushRegistration, syncPushRegistrationIfGranted } from "./src/features/notifications/registration";
 
 type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
@@ -62,6 +63,9 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [showTypingStatus, setShowTypingStatus] = useState(true);
   const [settingsError, setSettingsError] = useState("");
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState("");
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
     text: palette.darkText, muted: palette.darkMuted, line: palette.darkLine
@@ -161,6 +165,51 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     });
     return () => { active = false; };
   }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile || !supabase) return;
+    let active = true;
+    let tokenSubscription: { remove: () => void } | null = null;
+    void syncPushRegistrationIfGranted().then(enabled => {
+      if (!active) return;
+      setPushEnabled(enabled);
+      if (enabled) {
+        try {
+          tokenSubscription = listenForPushTokenChanges();
+        } catch (error) {
+          setPushError(error instanceof Error ? error.message : "Could not watch push token changes.");
+        }
+      }
+    }).catch(error => {
+      if (active) setPushError(error instanceof Error ? error.message : "Could not sync push notifications.");
+    });
+    return () => {
+      active = false;
+      tokenSubscription?.remove();
+    };
+  }, [profile?.id]);
+
+  async function togglePushNotifications() {
+    setPushBusy(true);
+    setPushError("");
+    try {
+      if (pushEnabled) {
+        await disablePushNotifications();
+        setPushEnabled(false);
+      } else {
+        await enablePushNotifications();
+        setPushEnabled(true);
+        try {
+          // Keep the Expo token registered if the provider rotates it later.
+          // A listener is installed by the account-scoped effect on next render.
+        } catch {}
+      }
+    } catch (error) {
+      setPushError(error instanceof Error ? error.message : "Could not update notification settings.");
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!profile || !supabase) return;
@@ -571,6 +620,17 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
           </View>
           {profile ? (
             <>
+              <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>Notifications</Text>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}>
+                  <Text style={[styles.settingTitle, { color: c.text }]}>Message notifications</Text>
+                  <Text style={[styles.settingHint, { color: c.muted }]}>{pushEnabled ? "This device is registered for private message alerts." : "Receive a generic alert when a new message arrives."}</Text>
+                </View>
+                <Pressable accessibilityRole="button" disabled={pushBusy} onPress={() => void togglePushNotifications()} style={[styles.smallAction, pushBusy && { opacity: 0.55 }]}>
+                  <Text style={styles.smallActionText}>{pushBusy ? "..." : pushEnabled ? "Turn off" : "Enable"}</Text>
+                </Pressable>
+              </View>
+              {pushError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{pushError}</Text> : null}
               <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>Privacy controls</Text>
               <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
                 <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Read receipts</Text><Text style={[styles.settingHint, { color: c.muted }]}>Let people know when you have read their messages.</Text></View>
@@ -637,6 +697,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 19, fontWeight: "800", textAlign: "center" },
   emptyCopy: { textAlign: "center", fontSize: 13, lineHeight: 20, marginTop: 8 },
   settingCard: { borderRadius: radius.lg, padding: spacing.lg, flexDirection: "row", alignItems: "center", marginBottom: spacing.md },
+  smallAction: { minWidth: 76, minHeight: 36, paddingHorizontal: 10, borderRadius: radius.md, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" },
+  smallActionText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   settingCopy: { flex: 1, paddingRight: 12 },
   settingTitle: { fontSize: 14, fontWeight: "700" },
   settingHint: { fontSize: 12, marginTop: 4, lineHeight: 17 },
@@ -785,6 +847,11 @@ export default function App() {
   }, [session?.user.id]);
 
   async function signOut() {
+    try {
+      await revokeCurrentPushRegistration();
+    } catch (error) {
+      console.warn("ChitChat could not revoke this device's push token before sign-out.", error);
+    }
     if (supabase) await supabase.auth.signOut();
     setDemoMode(false);
     setProfile(null);
