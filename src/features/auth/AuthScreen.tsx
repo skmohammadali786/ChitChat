@@ -132,7 +132,7 @@ export function AuthScreen({ onContinueDemo }: Props) {
           {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
 
           <Pressable accessibilityRole="button" disabled={busy} onPress={submit} style={[styles.primary, busy && styles.disabled]}>
-            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isSignup ? "Create account" : "Sign in"}</Text>}
+            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isSignup ? "Create account" : isReset ? "Send reset link" : "Sign in"}</Text>}
           </Pressable>
 
           {mode === "signin" ? (
