@@ -1,14 +1,18 @@
 # Implementation plan
 
-## Phase 1: app foundation
-- Expo + React Native + TypeScript, Android-first.
-- Astryx-informed design conventions implemented natively: semantic tokens, consistent component APIs, state coverage, accessibility, and restrained visual hierarchy.
-- Chat list, conversation view, message composer, secret reveal interaction, settings shell, and theme foundation.
-- Local mock data only. No false claim of backend persistence or encryption.
+## Completed in the foundation
+- Expo, React Native, TypeScript app shell.
+- Astryx-informed semantic tokens and component conventions.
+- Chat list, local conversation prototype, message composer, and secret reveal/re-hide UI.
+- Light/dark theme and recipient auto-reveal preference.
+- Supabase email/password auth client with persistent mobile session storage.
+- Sign-up, sign-in, email confirmation deep-link handling, and username/profile onboarding.
+- SQL setup script with least-privilege grants and row-level security for private profiles.
 
 ## Phase 2: identity and backend
-- Supabase Auth, username profiles, device registration, contact discovery controls.
-- Database schema with strict row-level security.
+- Complete Supabase project setup and app environment configuration.
+- Username availability checks and profile editing.
+- Device registration and account recovery design.
 - Realtime conversation events and offline outbox.
 - Storage policies for media and short-lived secret assets.
 
@@ -18,6 +22,7 @@
 - Threat model and independent security review before public claims.
 
 ## Phase 4: full messaging
+- Message persistence and realtime delivery.
 - Media, voice notes, files, groups, reactions, replies, search, scheduled messages, disappearing messages.
 - Push notifications with privacy-preserving payloads.
 - Abuse prevention, block/report, and operational monitoring.
@@ -27,8 +32,7 @@
 - Optional subscription for convenience and customization only.
 
 ## Definition of done
-- TypeScript passes.
-- Android build launches.
-- Every interactive control has a real behavior or is clearly marked as planned.
+- TypeScript passes and Android build launches.
+- Every interactive control has real behavior or is clearly marked as planned.
 - Loading, empty, error, disabled, and success states are designed.
 - Privacy and encryption claims match verified code.
