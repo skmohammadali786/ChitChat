@@ -10,10 +10,12 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./src/features/auth/AuthScreen";
 import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
+import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
+import type { DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 
-type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean };
+type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; conversationId?: string; remoteUserId?: string };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
 
 const initialChats: Chat[] = [
@@ -34,6 +36,7 @@ const seedMessages: Message[] = [
 function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [showNewChat, setShowNewChat] = useState(false);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>(seedMessages);
@@ -56,7 +59,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
     setDraft("");
   }
 
-  const Header = ({ title, subtitle, back }: { title: string; subtitle?: string; back?: () => void }) => (
+  const Header = ({ title, subtitle, back, newAction }: { title: string; subtitle?: string; back?: () => void; newAction?: () => void }) => (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
         {back ? <Pressable onPress={back} style={styles.backButton}><Text style={{ color: c.text, fontSize: 25 }}>‹</Text></Pressable> : null}
@@ -65,37 +68,86 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           {subtitle ? <Text style={[styles.subtitle, { color: c.muted }]}>{subtitle}</Text> : null}
         </View>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={() => setSearch("")}>
-        <Text style={styles.newButtonText}>＋</Text>
-      </Pressable>
+      {!back ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction ?? (() => setSearch(""))}>
+          <Text style={styles.newButtonText}>＋</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
+
+  if (showNewChat) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <NewChatScreen
+          hasAccount={Boolean(profile)}
+          onBack={() => setShowNewChat(false)}
+          onSignIn={() => { setShowNewChat(false); onExitDemo?.(); }}
+          onConversationCreated={(conversationId: string, person: DiscoverableProfile) => {
+            const initials = person.display_name.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+            setMessages([]);
+            setActiveChat({
+              id: conversationId,
+              name: person.display_name,
+              initials,
+              color: "#D8D1FF",
+              message: "Conversation created",
+              time: "now",
+              unread: 0,
+              isReal: true,
+              conversationId,
+              remoteUserId: person.id,
+            });
+            setShowNewChat(false);
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (activeChat) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <Header title={activeChat.name} subtitle={activeChat.online ? "online now" : "last seen recently"} back={() => setActiveChat(null)} />
-        <View style={[styles.encryptionNote, { backgroundColor: dark ? "#202B35" : "#EAF6EF" }]}>
-          <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 11, textAlign: "center" }}>✦  Your private space. Message encryption will be enabled in the security phase.</Text>
+        <View style={[styles.encryptionNote, { backgroundColor: activeChat.isReal ? (dark ? "#282342" : "#EEEAFE") : (dark ? "#202B35" : "#EAF6EF") }]}>
+          <Text style={{ color: activeChat.isReal ? (dark ? "#D8D0FF" : "#6559A6") : (dark ? "#B8E8CE" : "#327653"), fontSize: 11, textAlign: "center" }}>
+            {activeChat.isReal ? "Conversation created. Sending is paused until end-to-end encryption is ready." : "Demo conversation. Messages are local sample data and are not sent or encrypted."}
+          </Text>
         </View>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
           <ScrollView contentContainerStyle={styles.messageList}>
-            <Text style={[styles.dayLabel, { color: c.muted }]}>TODAY</Text>
-            {messages.map(message => (
+            {activeChat.isReal ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 24, paddingVertical: 28 }}>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: "800" }}>Conversation is ready</Text>
+                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 7 }}>ChitChat will enable message sending here after device keys and end-to-end encryption are implemented. No plaintext message has been sent.</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.dayLabel, { color: c.muted }]}>TODAY</Text>
+                {messages.map(message => (
               <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
                 <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
                   {message.secret ? <SecretReveal text="I saved you the window seat. The view is beautiful, just like you said it would be." autoReveal={autoReveal} /> : <Text style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
                   <Text style={[styles.messageTime, { color: message.mine ? "#E7E2FF" : c.muted }]}>{message.time}  {message.mine ? "✓✓" : ""}</Text>
                 </View>
               </View>
-            ))}
+                ))}
+              </>
+            )}
           </ScrollView>
-          <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
-            <Pressable style={styles.attachButton}><Text style={{ fontSize: 23, color: c.muted }}>＋</Text></Pressable>
-            <TextInput value={draft} onChangeText={setDraft} placeholder="Write a message..." placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
-            <Pressable accessibilityRole="button" accessibilityLabel="Send message" onPress={sendMessage} style={styles.sendButton}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
-          </View>
+          {activeChat.isReal ? (
+            <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
+              <Text style={{ color: c.muted, fontSize: 12, textAlign: "center", flex: 1 }}>Secure messaging is not enabled yet.</Text>
+            </View>
+          ) : (
+            <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
+              <Pressable style={styles.attachButton}><Text style={{ fontSize: 23, color: c.muted }}>＋</Text></Pressable>
+              <TextInput value={draft} onChangeText={setDraft} placeholder="Write a message..." placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
+              <Pressable accessibilityRole="button" accessibilityLabel="Send message" onPress={sendMessage} style={styles.sendButton}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -104,7 +156,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
-      <Header title="ChitChat" subtitle="A little more personal." />
+      <Header title="ChitChat" subtitle="A little more personal." newAction={() => setShowNewChat(true)} />
       {tab === "Chats" ? (
         <>
           <View style={[styles.searchBox, { backgroundColor: c.surface }]}>
@@ -162,7 +214,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           ) : (
             <View style={[styles.infoCard, { backgroundColor: dark ? "#202B35" : "#EAF6EF", marginBottom: spacing.xl }]}>
               <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontWeight: "800", fontSize: 13 }}>Demo mode</Text>
-              <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 12, lineHeight: 18, marginTop: 5 }}>These conversations use local sample data. Connect a ChitChat Supabase project to enable accounts and cloud sync.</Text>
+              <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 12, lineHeight: 18, marginTop: 5 }}>These conversations use local sample data. Sign in to discover people and create conversations. Message delivery is still in development.</Text>
               {onExitDemo ? (
                 <Pressable accessibilityRole="button" onPress={onExitDemo} style={{ alignSelf: "flex-start", paddingTop: 12 }}>
                   <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign in to your account</Text>
@@ -183,7 +235,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
             <Text style={{ color: palette.brand, fontWeight: "800", fontSize: 15 }}>Your privacy, your rules.</Text>
             <Text style={{ color: dark ? "#D8D0FF" : "#6559A6", lineHeight: 20, marginTop: 7, fontSize: 13 }}>Choose how secret messages appear. You can reveal them when you're ready, then hide them again.</Text>
           </View>
-          <Text style={[styles.version, { color: c.muted }]}>ChitChat · Early preview · v0.1.0</Text>
+          <Text style={[styles.version, { color: c.muted }]}>ChitChat · Early preview · v0.2.0</Text>
         </ScrollView>
       )}
       <View style={[styles.tabBar, { backgroundColor: c.surface, borderTopColor: c.line }]}>
