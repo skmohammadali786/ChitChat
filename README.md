@@ -1,44 +1,33 @@
 # ChitChat
 
-ChitChat is an Android-first, privacy-focused messaging app. Its signature feature lets people conceal text or media and gives recipients control over when secret content is revealed.
+ChitChat is an Android and iOS messaging app with a TypeScript React Native UI and a shared Rust domain core.
 
-## Stack
-- Expo SDK 58, React Native 0.88, React 19.3, TypeScript
-- Supabase Auth, Postgres, and Realtime foundations
-- Astryx-informed in-house design conventions, without importing Astryx as a runtime dependency
+## Architecture
+- TypeScript owns the full UI, navigation, accessibility, Expo integration, and Supabase Auth, PostgREST, Realtime, and Storage client calls.
+- Rust owns portable domain validation, encrypted-envelope validation, and the future cryptographic boundary.
+- Supabase provides authentication, database persistence, private storage, and realtime events.
 
-## Run locally
-1. Use Node.js 22.13 or newer.
-2. Install dependencies: `npm install`.
-3. Copy `.env.example` to `.env` and add your dedicated ChitChat Supabase project URL and publishable key.
-4. Start the app: `npx expo start`.
-5. Use a development build for device testing.
+See [Rust architecture](docs/RUST_ARCHITECTURE.md) and [security decisions](docs/SECURITY_DECISIONS.md).
 
-Without Supabase credentials, the app opens in local demo mode. Demo messages are not stored remotely.
+## Backend
+The dedicated project is `roqostmesaxplurzjoin`. Its schema is installed and managed with Supabase migrations. See [backend setup](docs/SUPABASE_SETUP.md).
 
-## Implemented foundations
-- Conversation list and local demo chat UI.
-- Secret-message reveal and re-hide interaction.
-- Light and dark appearance and recipient auto-reveal preference.
-- Supabase email/password sign-up, sign-in, email confirmation callback, and password recovery.
-- Encrypted mobile session persistence using Expo SecureStore.
-- Profile onboarding with username, display name, bio, and username-discovery preference.
-- Exact username lookup, with a server-side per-user rate limit.
-- Direct conversation creation and conversation list APIs.
-- Conversation and ciphertext-only message table schema with membership-based RLS.
-- Encrypted-message service interface and Realtime subscription interface.
+## Run the TypeScript app
+Use Node.js 22.13 or newer:
+```bash
+npm ci
+npx expo start
+```
 
-## Backend setup
-Follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) and run the SQL scripts in order:
-1. [Profile setup](supabase/setup/profiles.sql)
-2. [Messaging setup](supabase/setup/messaging.sql)
+Expo Go cannot load ChitChat's custom Rust module. Use custom Android and iOS development builds after the native bridges are implemented.
+
+## Run Rust tests
+Install stable Rust:
+```bash
+cargo test --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+```
 
 ## Security status
-End-to-end encryption is not implemented yet. The current message service accepts ciphertext envelopes only, but the app does not yet create or decrypt them. Real conversation message sending is intentionally disabled. Do not treat demo messages as encrypted, and do not add plaintext fallback.
-
-See [security decisions](docs/SECURITY_DECISIONS.md) for protocol evaluation and release requirements.
-
-## Product and design
-- [Product blueprint](docs/PRODUCT_BLUEPRINT.md)
-- [Design system](docs/DESIGN_SYSTEM.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+End-to-end encryption is not complete. The database stores ciphertext envelopes only, and real conversation message sending is disabled. Do not claim messages are encrypted until protocol integration, device keys, native bridges, Android/iOS interoperability, and an independent security review are complete.
