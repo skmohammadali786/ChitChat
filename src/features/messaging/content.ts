@@ -58,10 +58,12 @@ export function validateMessageContentShape(content: MessageContent): void {
     throw new Error("Message content has an unsupported version or block count.");
   }
 
+  let totalTextBytes = 0;
   for (const block of content.blocks) {
     if (block.type === "text") {
+      totalTextBytes += utf8ByteLength(block.text);
       if (!block.text || block.text.includes("\0") ||
-          utf8ByteLength(block.text) > 64 * 1024) {
+          utf8ByteLength(block.text) > 64 * 1024 || totalTextBytes > 512 * 1024) {
         throw new Error("A text block is empty or exceeds the content limit.");
       }
       continue;
