@@ -20,7 +20,7 @@
 - Verify email confirmation and password recovery deep links on Android and iOS.
 - Verify username discovery opt-out, exact lookup, rate limiting, and RLS behavior.
 - Verify direct conversation creation is idempotent and only members can list/read it.
-- Add profile editing and avatar uploads with strict storage policies.
+- Add profile editing and avatar uploads through the private Cloudflare R2 media API, with Supabase authorization metadata.
 - Add device registration and account recovery design.
 
 ## Phase 3: secure messaging
@@ -41,7 +41,7 @@
 - Expiring, revocable encrypted secret links with strict authorization.
 - Optional subscription for convenience and customization only.
 
-## Definition of done
+## Complete feature checklist\nSee [FEATURE_ACCEPTANCE_MATRIX.md](FEATURE_ACCEPTANCE_MATRIX.md). It tracks every product feature and its verified status.\n\n## Definition of done
 - TypeScript passes and Android development build launches.
 - Backend SQL has been applied and verified against a dedicated ChitChat project.
 - Every exposed table has deliberate grants and RLS policies.
