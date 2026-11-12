@@ -44,7 +44,7 @@ export function subscribeToMessageReceipts(
       const row = payload.new as MessageReceipt | undefined;
       if (row?.message_id) onReceipt(row);
     })
-    .subscribe();
+  void client().realtime.setAuth().then(() => channel.subscribe());
   return () => {
     void client().removeChannel(channel);
   };
