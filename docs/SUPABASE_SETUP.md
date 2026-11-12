@@ -31,11 +31,10 @@ See [Cloudflare R2 media storage](CLOUDFLARE_MEDIA.md). The private `chitchat-me
 The `notify-message` Edge Function is deployed with JWT verification enabled. It sends generic alerts only, never message plaintext or encryption keys. The Expo app needs `EXPO_PUBLIC_EAS_PROJECT_ID` configured after `eas init` before token registration can work. Expo push credentials and real-device delivery still need setup and verification.
 
 
-## Migration reproducibility warning
+## Migration reproducibility
 
-The live project records the initial migrations `20261112180603` through `20261112182101`, but those five SQL files are not currently present in `supabase/migrations` on this branch. Their baseline schema is represented in the two setup scripts:
-1. Run `supabase/setup/profiles.sql`.
-2. Run `supabase/setup/messaging.sql`.
-3. Apply the tracked migration files in timestamp order.
+The five initial migration versions missing from the branch have been restored:
+- `20261112180603` contains a consolidated baseline from `supabase/setup/profiles.sql` and `supabase/setup/messaging.sql`.
+- `20261112180627`, `20261112180642`, `20261112182000`, and `20261112182101` are historical no-op placeholders because their resulting hardened RPC, invoker-wrapper, and private-trigger state is already included in the consolidated baseline.
 
-This is a bootstrap workaround, not a clean migration history. Before a fresh-project release or a standard `supabase db push`, the original baseline migrations must be reconstructed and committed so the database can be created from migration history alone.
+The later migrations remain in timestamp order. This reconstruction has not yet been tested against a completely empty Supabase database. Do not claim clean-install reproducibility until a fresh database migration test passes. The setup scripts remain available as reference/bootstrap material.
