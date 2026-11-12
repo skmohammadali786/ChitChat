@@ -16,10 +16,11 @@ type Props = {
   conversationId: string;
   initialTitle: string;
   onBack: () => void;
+  onLeft: () => void;
   onRenamed: (title: string) => void;
 };
 
-export function GroupManagementScreen({ conversationId, initialTitle, onBack, onRenamed }: Props) {
+export function GroupManagementScreen({ conversationId, initialTitle, onBack, onLeft, onRenamed }: Props) {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [title, setTitle] = useState(initialTitle);
@@ -99,7 +100,17 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
         {
           text: isSelf ? "Leave group" : "Remove",
           style: "destructive",
-          onPress: () => void run(() => removeGroupMember(conversationId, member.user_id)),
+          onPress: () => {
+            if (!isSelf) {
+              void run(() => removeGroupMember(conversationId, member.user_id));
+              return;
+            }
+            setWorking(true);
+            void removeGroupMember(conversationId, member.user_id)
+              .then(onLeft)
+              .catch(caught => setError(caught instanceof Error ? caught.message : "Could not leave this group."))
+              .finally(() => setWorking(false));
+          },
         },
       ],
     );
