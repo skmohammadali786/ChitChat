@@ -3,6 +3,43 @@
 -- Message bodies are represented by ciphertext + nonce. Do not add plaintext
 -- message columns or write plaintext content into crypto_header.
 
+
+-- User blocks are private edges. A block affects exact username discovery
+-- and prevents new direct-message delivery in either direction.
+create table if not exists public.user_blocks (
+  blocker_id uuid not null references auth.users (id) on delete cascade,
+  blocked_user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_user_id),
+  constraint user_blocks_no_self check (blocker_id <> blocked_user_id)
+);
+
+alter table public.user_blocks enable row level security;
+revoke all on table public.user_blocks from anon, public;
+grant select, insert, delete on table public.user_blocks to authenticated;
+
+drop policy if exists "user_blocks_read_own" on public.user_blocks;
+create policy "user_blocks_read_own"
+  on public.user_blocks for select to authenticated
+  using (blocker_id = (select auth.uid()));
+
+drop policy if exists "user_blocks_insert_own" on public.user_blocks;
+create policy "user_blocks_insert_own"
+  on public.user_blocks for insert to authenticated
+  with check (
+    blocker_id = (select auth.uid())
+    and blocked_user_id <> (select auth.uid())
+    and exists (
+      select 1 from public.profiles as target_profile
+      where target_profile.id = blocked_user_id
+    )
+  );
+
+drop policy if exists "user_blocks_delete_own" on public.user_blocks;
+create policy "user_blocks_delete_own"
+  on public.user_blocks for delete to authenticated
+  using (blocker_id = (select auth.uid()));
+
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('direct', 'group')),
@@ -80,6 +117,43 @@ $$;
 revoke all on function public.is_conversation_member(uuid) from public, anon;
 grant execute on function public.is_conversation_member(uuid) to authenticated;
 
+
+create or replace function public.is_direct_conversation_blocked(
+  target_conversation_id uuid,
+  candidate_sender_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select
+    auth.uid() is null
+    or auth.uid() <> candidate_sender_id
+    or not public.is_conversation_member(target_conversation_id)
+    or exists (
+      select 1
+      from public.conversations as conversation_row
+      join public.conversation_members as other_member
+        on other_member.conversation_id = conversation_row.id
+       and other_member.user_id <> candidate_sender_id
+      join public.user_blocks as block_row
+        on (
+          block_row.blocker_id = candidate_sender_id
+          and block_row.blocked_user_id = other_member.user_id
+        ) or (
+          block_row.blocker_id = other_member.user_id
+          and block_row.blocked_user_id = candidate_sender_id
+        )
+      where conversation_row.id = target_conversation_id
+        and conversation_row.kind = 'direct'
+    );
+$;
+
+revoke all on function public.is_direct_conversation_blocked(uuid, uuid) from public, anon;
+grant execute on function public.is_direct_conversation_blocked(uuid, uuid) to authenticated;
+
 drop policy if exists "conversations_read_members" on public.conversations;
 create policy "conversations_read_members"
   on public.conversations
@@ -126,6 +200,7 @@ create policy "messages_insert_as_self_member"
     sender_id = (select auth.uid())
     and message_type <> 'system'
     and public.is_conversation_member(conversation_id)
+    and not public.is_direct_conversation_blocked(conversation_id, sender_id)
   );
 
 drop policy if exists "messages_delete_own" on public.messages;
@@ -180,6 +255,15 @@ begin
       and profile_row.discoverable = true
   ) then
     raise exception 'That account is not available for username discovery' using errcode = 'P0002';
+  end if;
+
+  if exists (
+    select 1
+    from public.user_blocks as block_row
+    where (block_row.blocker_id = caller_id and block_row.blocked_user_id = target_user_id)
+       or (block_row.blocker_id = target_user_id and block_row.blocked_user_id = caller_id)
+  ) then
+    raise exception 'This conversation is not available' using errcode = '42501';
   end if;
 
   -- Serialize direct-chat creation for the same pair to avoid duplicate DMs.
