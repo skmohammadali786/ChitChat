@@ -28,7 +28,7 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Supabase group RPCs, group creation UI, member listing, add/remove, rename, leave and owner transfer UI exist; invitations and E2EE key rotation remain |
+| Groups | PARTIAL | Group create/manage UI and RPCs exist; server RPCs now enforce discoverability and block checks even when called outside the UI. Invitations and E2EE key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | NOT STARTED | Respect sender policy and platform limitations |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
