@@ -33,7 +33,7 @@ Legend:
 | Copy restrictions | NOT STARTED | Respect sender policy and platform limitations |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
 | Search | NOT STARTED | Local encrypted search index, no server-side plaintext indexing |
-| Pin, mute, archive, delete | NOT STARTED | Per-user conversation state and deletion semantics |
+| Pin, mute, archive, delete | PARTIAL | Per-user pin/mute/archive UI and persistence exist; muted conversations are excluded from push delivery. Delete and hidden-state UI remain |
 | Typing and presence | PARTIAL | Private membership-authorized Realtime channels, privacy-aware client service, active-chat online state and incoming typing indicator are wired; outgoing typing events and device tests remain |
 
 ## Secret content
