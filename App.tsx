@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
+  ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
 import { Avatar } from "./src/components/Avatar";
@@ -11,7 +11,8 @@ import { AuthScreen } from "./src/features/auth/AuthScreen";
 import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
-import { loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
+import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
+import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference } from "./src/lib/preferences";
@@ -39,6 +40,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
@@ -154,7 +156,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
     setDraftSecret(false);
   }
 
-  const Header = ({ title, subtitle, back, newAction }: { title: string; subtitle?: string; back?: () => void; newAction?: () => void }) => (
+  const Header = ({ title, subtitle, back, newAction, action }: { title: string; subtitle?: string; back?: () => void; newAction?: () => void; action?: { label: string; onPress: () => void } }) => (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
         {back ? <Pressable onPress={back} style={styles.backButton}><Text style={{ color: c.text, fontSize: 25 }}>‹</Text></Pressable> : null}
@@ -163,13 +165,26 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           {subtitle ? <Text style={[styles.subtitle, { color: c.muted }]}>{subtitle}</Text> : null}
         </View>
       </View>
-      {!back && newAction ? (
+      {action ? (
+        <Pressable accessibilityRole="button" onPress={action.onPress} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+          <Text style={{ color: "#B42318", fontSize: 12, fontWeight: "800" }}>{action.label}</Text>
+        </Pressable>
+      ) : !back && newAction ? (
         <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction}>
           <Text style={styles.newButtonText}>＋</Text>
         </Pressable>
       ) : null}
     </View>
   );
+
+  if (showBlockedUsers) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <BlockedUsersScreen onBack={() => setShowBlockedUsers(false)} />
+      </SafeAreaView>
+    );
+  }
 
   if (showNewChat) {
     return (
@@ -207,7 +222,34 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
-        <Header title={activeChat.name} subtitle={activeChat.online ? "online now" : "last seen recently"} back={() => setActiveChat(null)} />
+        <Header
+          title={activeChat.name}
+          subtitle={activeChat.online ? "online now" : "last seen recently"}
+          back={() => setActiveChat(null)}
+          action={activeChat.isReal && activeChat.remoteUserId ? {
+            label: "Block",
+            onPress: () => Alert.alert(
+              "Block this account?",
+              `You will not find or receive new direct messages from @${activeChat.name}. You can unblock them later in Settings.`,
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Block",
+                  style: "destructive",
+                  onPress: () => {
+                    const targetUserId = activeChat.remoteUserId!;
+                    void blockUser(targetUserId).then(() => {
+                      setChats(old => old.filter(chat => chat.remoteUserId !== targetUserId));
+                      setActiveChat(null);
+                    }).catch(error => {
+                      Alert.alert("Could not block account", error instanceof Error ? error.message : "Please try again.");
+                    });
+                  }
+                }
+              ]
+            )
+          } : undefined}
+        />
         <View style={[styles.encryptionNote, { backgroundColor: activeChat.isReal ? (dark ? "#282342" : "#EEEAFE") : (dark ? "#202B35" : "#EAF6EF") }]}>
           <Text style={{ color: activeChat.isReal ? (dark ? "#D8D0FF" : "#6559A6") : (dark ? "#B8E8CE" : "#327653"), fontSize: 11, textAlign: "center" }}>
             {activeChat.isReal ? "Conversation created. Sending is paused until end-to-end encryption is ready." : "Demo conversation. Messages are local sample data and are not sent or encrypted."}
@@ -356,6 +398,15 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
               ) : null}
             </View>
           )}
+          {profile ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowBlockedUsers(true)} style={[styles.settingCard, { backgroundColor: c.surface }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Blocked accounts</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Manage people you have blocked.</Text>
+              </View>
+              <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
+            </Pressable>
+          ) : null}
           <Text style={[styles.sectionTitle, { color: c.text, marginBottom: spacing.lg }]}>Your experience</Text>
           <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Dark appearance</Text><Text style={[styles.settingHint, { color: c.muted }]}>Use a darker color palette</Text></View>
