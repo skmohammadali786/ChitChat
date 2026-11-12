@@ -56,11 +56,11 @@ function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
 
 
 export type BlockedProfile = {
-  blocked_user_id: string;
+  blocked_id: string;
   username: string | null;
   display_name: string | null;
-  avatar_url: string | null;
-  blocked_at: string;
+  avatar_path: string | null;
+  created_at: string;
 };
 
 export async function blockUser(targetUserId: string): Promise<void> {
@@ -73,7 +73,7 @@ export async function blockUser(targetUserId: string): Promise<void> {
 
   const { error } = await client.from("user_blocks").insert({
     blocker_id: user.id,
-    blocked_user_id: targetUserId,
+    blocked_id: targetUserId,
   });
   if (error && error.code !== "23505") throw error;
 }
@@ -88,7 +88,7 @@ export async function unblockUser(targetUserId: string): Promise<void> {
     .from("user_blocks")
     .delete()
     .eq("blocker_id", user.id)
-    .eq("blocked_user_id", targetUserId);
+    .eq("blocked_id", targetUserId);
   if (error) throw error;
 }
 
@@ -107,7 +107,7 @@ export type ConversationSummary = {
   other_user_id: string | null;
   other_username: string | null;
   other_display_name: string | null;
-  other_avatar_url: string | null;
+  other_avatar_path: string | null;
 };
 
 export async function loadMyConversations(): Promise<ConversationSummary[]> {
@@ -121,7 +121,7 @@ export type DiscoverableProfile = {
   id: string;
   username: string;
   display_name: string;
-  avatar_url: string | null;
+  avatar_path: string | null;
 };
 
 export async function lookupProfileByUsername(username: string): Promise<DiscoverableProfile | null> {
