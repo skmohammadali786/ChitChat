@@ -29,10 +29,6 @@ create policy "user_blocks_insert_own"
   with check (
     blocker_id = (select auth.uid())
     and blocked_user_id <> (select auth.uid())
-    and exists (
-      select 1 from public.profiles as target_profile
-      where target_profile.id = blocked_user_id
-    )
   );
 
 drop policy if exists "user_blocks_delete_own" on public.user_blocks;
@@ -411,3 +407,112 @@ $$;
 
 revoke all on function public.list_my_conversations() from public, anon;
 grant execute on function public.list_my_conversations() to authenticated;
+
+
+-- Extend the existing exact-username lookup to hide blocked pairs in both
+-- directions. This remains a narrow result set with a per-user rate limit.
+create or replace function public.lookup_profile_by_username(search_username text)
+returns table (
+  id uuid,
+  username text,
+  display_name text,
+  avatar_url text
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_requester_id uuid := auth.uid();
+  v_normalized_username text := lower(trim(search_username));
+  v_recent_searches integer;
+begin
+  if v_requester_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  if v_normalized_username is null
+     or char_length(v_normalized_username) < 3
+     or char_length(v_normalized_username) > 20
+     or v_normalized_username !~ '^[a-z0-9_]{3,20}$' then
+    return;
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(v_requester_id::text, 1)
+  );
+
+  delete from private.profile_search_events as search_event
+   where search_event.requester_id = v_requester_id
+     and search_event.searched_at < now() - interval '1 minute';
+
+  select pg_catalog.count(*)::integer
+    into v_recent_searches
+  from private.profile_search_events as search_event
+  where search_event.requester_id = v_requester_id;
+
+  if v_recent_searches >= 20 then
+    raise exception 'Too many username lookups. Try again in a minute.'
+      using errcode = 'P0001';
+  end if;
+
+  insert into private.profile_search_events (requester_id)
+  values (v_requester_id);
+
+  return query
+    select profile_row.id, profile_row.username, profile_row.display_name, profile_row.avatar_url
+    from public.profiles as profile_row
+    where lower(profile_row.username) = v_normalized_username
+      and profile_row.discoverable = true
+      and profile_row.id <> v_requester_id
+      and not exists (
+        select 1
+        from public.user_blocks as block_row
+        where (block_row.blocker_id = v_requester_id and block_row.blocked_user_id = profile_row.id)
+           or (block_row.blocker_id = profile_row.id and block_row.blocked_user_id = v_requester_id)
+      )
+    limit 1;
+end;
+$$;
+
+revoke all on function public.lookup_profile_by_username(text) from public, anon;
+grant execute on function public.lookup_profile_by_username(text) to authenticated;
+
+create or replace function public.list_my_blocks()
+returns table (
+  blocked_user_id uuid,
+  username text,
+  display_name text,
+  avatar_url text,
+  blocked_at timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_requester_id uuid := auth.uid();
+begin
+  if v_requester_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  return query
+    select
+      block_row.blocked_user_id,
+      profile_row.username,
+      profile_row.display_name,
+      profile_row.avatar_url,
+      block_row.created_at
+    from public.user_blocks as block_row
+    left join public.profiles as profile_row
+      on profile_row.id = block_row.blocked_user_id
+    where block_row.blocker_id = v_requester_id
+    order by block_row.created_at desc
+    limit 200;
+end;
+$$;
+
+revoke all on function public.list_my_blocks() from public, anon;
+grant execute on function public.list_my_blocks() to authenticated;
