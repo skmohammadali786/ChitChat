@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import type { ChitChatProfile } from "../../lib/supabase";
 import { supabase } from "../../lib/supabase";
+import { chitchatCore } from "../../native/chitchatCore";
 import { palette, radius, spacing, typeScale } from "../../theme/tokens";
 
 type Props = {
@@ -41,6 +42,20 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
     if (!supabase) {
       setError("Supabase is not configured.");
       return;
+    }
+
+    if (chitchatCore.available) {
+      try {
+        await chitchatCore.validateProfile({
+          username: cleanUsername,
+          display_name: cleanDisplayName,
+          bio: cleanBio,
+          discoverable: profile.discoverable,
+        });
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "The Rust profile validator rejected these details.");
+        return;
+      }
     }
 
     setBusy(true);
