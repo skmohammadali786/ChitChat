@@ -33,6 +33,10 @@ function requireClient() {
 }
 
 function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
+  const supportedTypes: EncryptedMessageType[] = ["text", "image", "video", "audio", "file", "system"];
+  if (!supportedTypes.includes(envelope.message_type)) {
+    throw new Error("The encrypted message type is not supported.");
+  }
   if (!envelope.client_message_id) throw new Error("A client message ID is required.");
   if (!envelope.ciphertext || envelope.ciphertext.length > 1_000_000) {
     throw new Error("The encrypted message payload is missing or too large.");
@@ -101,6 +105,17 @@ export async function sendEncryptedMessage(
     .select("id, conversation_id, sender_id, client_message_id, message_type, ciphertext, nonce, crypto_header, key_version, created_at, expires_at")
     .single();
 
+  if (error?.code === "23505") {
+    // The original insert may have reached Postgres even if the client lost
+    // its response. Fetch the existing row so an outbox retry stays idempotent.
+    const { data: existing, error: lookupError } = await client
+      .from("messages")
+      .select("id, conversation_id, sender_id, client_message_id, message_type, ciphertext, nonce, crypto_header, key_version, created_at, expires_at")
+      .eq("sender_id", user.id)
+      .eq("client_message_id", envelope.client_message_id)
+      .maybeSingle();
+    if (!lookupError && existing) return existing as EncryptedMessageRecord;
+  }
   if (error) throw error;
   return data as EncryptedMessageRecord;
 }
