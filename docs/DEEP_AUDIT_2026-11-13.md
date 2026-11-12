@@ -105,7 +105,8 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 
 ## Follow-up implementation after the audit
 
-- Security audit found that group creation/add-member RPCs checked profile existence but did not enforce `profiles.discoverable`. A caller who knew a UUID could bypass the username-lookup privacy gate. Fixed both private RPC implementations in Supabase migration `20261112191645_enforce_discoverable_group_members`; the deployed functions now reject new non-discoverable members while allowing existing group members to remain after opting out. The migration is committed to the branch. Supabase security advisor returned no lints after the change.
+- Security audit found that group creation/add-member RPCs checked profile existence but did not enforce `profiles.discoverable`. A caller who knew a UUID could bypass the username-lookup privacy gate. Fixed both private RPC implementations in Supabase migration `20261112191645_enforce_discoverable_group_members`; the deployed functions now reject new non-discoverable members while allowing existing group members to remain after opting out.
+- A second block-flow review found that the conversation-list RPC continued returning blocked direct conversations after app restart. Migration `20261112191804_hide_blocked_direct_conversations` now hides direct chats if either participant has blocked the other. The deployed notification Edge Function was upgraded to version 4 and suppresses alerts in either direction of a block relationship, including a block created between message insert and notification dispatch. Both migrations are committed to the branch. Supabase security advisor returned no lints after the changes.
 
 - Added per-user conversation preference loading and safe partial updates that preserve other preference columns.
 - Added long-press actions for pinning, muting for eight hours, and archiving conversations.
