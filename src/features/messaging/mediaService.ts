@@ -19,6 +19,7 @@ export type StoredMedia = {
   media_kind: MediaKind | "avatar";
   size_bytes: number;
   encrypted: true;
+  crypto_version: number;
   storage: "cloudflare-r2";
 };
 
@@ -71,6 +72,8 @@ export async function uploadEncryptedMedia(
         "content-type": "application/octet-stream",
         "x-chitchat-media-kind": mediaKind,
         "x-content-sha256": payload.sha256,
+      "x-chitchat-crypto-version": String(payload.cryptoVersion),
+        "x-chitchat-crypto-version": String(payload.cryptoVersion),
       },
       body: payload.bytes,
     },
@@ -105,6 +108,7 @@ export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Pro
 export async function downloadEncryptedMedia(mediaId: string): Promise<{
   bytes: ArrayBuffer;
   sha256: string;
+  cryptoVersion: number;
 }> {
   if (!mediaId) throw new Error("A media ID is required.");
   const token = await sessionToken();
@@ -113,8 +117,9 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   });
   if (!response.ok) throw await readError(response);
   const sha256 = response.headers.get("x-content-sha256") || "";
-  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error("The stored media digest is invalid.");
-  return { bytes: await response.arrayBuffer(), sha256 };
+  const cryptoVersion = Number(response.headers.get("x-chitchat-crypto-version") || "0");
+  if (!/^[a-f0-9]{64}$/.test(sha256) || !Number.isInteger(cryptoVersion) || cryptoVersion < 1) throw new Error("The stored media encryption metadata is invalid.");
+  return { bytes: await response.arrayBuffer(), sha256, cryptoVersion };
 }
 
 export async function deleteEncryptedMedia(mediaId: string): Promise<void> {
