@@ -36,7 +36,10 @@ const seedMessages: Message[] = [
 function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [chats, setChats] = useState<Chat[]>(initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
+  const [discoveryError, setDiscoveryError] = useState("");
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>(seedMessages);
@@ -50,7 +53,27 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
     text: palette.ink, muted: palette.muted, line: palette.line
   };
 
-  const filteredChats = useMemo(() => initialChats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [search]);
+  const filteredChats = useMemo(() => chats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+
+  useEffect(() => {
+    setDiscoveryEnabled(profile?.discoverable ?? false);
+    setDiscoveryError("");
+  }, [profile?.id, profile?.discoverable]);
+
+  async function toggleDiscovery() {
+    if (!profile || !supabase) return;
+    const nextValue = !discoveryEnabled;
+    setDiscoveryEnabled(nextValue);
+    setDiscoveryError("");
+    const { error } = await supabase
+      .from("profiles")
+      .update({ discoverable: nextValue })
+      .eq("id", profile.id);
+    if (error) {
+      setDiscoveryEnabled(!nextValue);
+      setDiscoveryError(error.message);
+    }
+  }
 
   function sendMessage() {
     const value = draft.trim();
@@ -87,18 +110,20 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
           onConversationCreated={(conversationId: string, person: DiscoverableProfile) => {
             const initials = person.display_name.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
             setMessages([]);
-            setActiveChat({
+            const newChat: Chat = {
               id: conversationId,
               name: person.display_name,
               initials,
               color: "#D8D1FF",
-              message: "Conversation created",
+              message: "New conversation",
               time: "now",
               unread: 0,
               isReal: true,
               conversationId,
               remoteUserId: person.id,
-            });
+            };
+            setChats(old => [newChat, ...old.filter(chat => chat.remoteUserId !== person.id && chat.conversationId !== conversationId)]);
+            setActiveChat(newChat);
             setShowNewChat(false);
           }}
         />
@@ -173,7 +198,10 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
             contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 110 }}
             ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: c.line }]} />}
             renderItem={({ item }) => (
-              <Pressable onPress={() => setActiveChat(item)} style={styles.chatRow}>
+              <Pressable onPress={() => {
+                if (!item.isReal) setMessages(seedMessages);
+                setActiveChat(item);
+              }} style={styles.chatRow}>
                 <Avatar initials={item.initials} color={item.color} online={item.online} />
                 <View style={styles.chatDetails}>
                   <View style={styles.chatTop}>
@@ -198,6 +226,23 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
+          {profile ? (
+            <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Username discovery</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Let people find you using @{profile.username}.</Text>
+              </View>
+              <Pressable
+                accessibilityRole="switch"
+                accessibilityState={{ checked: discoveryEnabled }}
+                onPress={toggleDiscovery}
+                style={[styles.toggle, discoveryEnabled && styles.toggleOn]}
+              >
+                <View style={[styles.toggleKnob, discoveryEnabled && styles.toggleKnobOn]} />
+              </Pressable>
+            </View>
+          ) : null}
+          {discoveryError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{discoveryError}</Text> : null}
           {profile ? (
             <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.xl }]}>
               <Avatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" />
