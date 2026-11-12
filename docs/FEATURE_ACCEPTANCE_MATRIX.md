@@ -77,7 +77,7 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Block/unblock | PARTIAL | Block list and unblock UI exist; direct conversations are hidden after block, group creation/add checks both directions, and push delivery excludes blocked relationships. Multi-user acceptance tests and group-specific block semantics remain |
+| Block/unblock | PARTIAL | Block list and unblock UI exist; direct conversations are hidden, direct message inserts are rejected, group creation/add checks both directions, and push delivery excludes blocked relationships. Multi-user acceptance tests and group-specific block semantics remain |
 | Report message/user | PARTIAL | Private report table exists; reporting UI, abuse triage and rate limits |
 | App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
