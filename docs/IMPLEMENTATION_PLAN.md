@@ -7,18 +7,21 @@
 - Light/dark theme and recipient auto-reveal preference.
 - Supabase email/password auth client with persistent mobile session storage.
 - Sign-up, sign-in, email confirmation deep-link handling, and username/profile onboarding.
-- SQL setup script with least-privilege grants and row-level security for private profiles.
+- Dedicated profile SQL setup with private row-level security policies.
+- Setup instructions covering Supabase Data API exposure and safe client credentials.
 
-## Phase 2: identity and backend
-- Complete Supabase project setup and app environment configuration.
-- Username availability checks and profile editing.
+## Phase 2: connect the backend
+- Create a dedicated ChitChat Supabase project and configure environment variables.
+- Verify email confirmation deep links on Android and iOS.
+- Add password recovery and username availability checks.
+- Add profile editing and avatar uploads with strict storage policies.
 - Device registration and account recovery design.
 - Realtime conversation events and offline outbox.
-- Storage policies for media and short-lived secret assets.
 
-## Phase 3: security
+## Phase 3: secure messaging
 - Select and integrate a reviewed end-to-end encryption protocol/library.
 - Device key lifecycle, key changes, verification, recovery, and multi-device strategy.
+- Define secret-message payload encryption, expiry, and local caching rules.
 - Threat model and independent security review before public claims.
 
 ## Phase 4: full messaging
@@ -32,7 +35,8 @@
 - Optional subscription for convenience and customization only.
 
 ## Definition of done
-- TypeScript passes and Android build launches.
+- TypeScript passes and Android development build launches.
 - Every interactive control has real behavior or is clearly marked as planned.
 - Loading, empty, error, disabled, and success states are designed.
+- All exposed tables have RLS, and Data API exposure is deliberate.
 - Privacy and encryption claims match verified code.
