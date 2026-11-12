@@ -20,6 +20,14 @@
     "web": {
       "bundler": "metro"
     },
-    "extra": {}
+    "extra": {},
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
+    ]
   }
 }
