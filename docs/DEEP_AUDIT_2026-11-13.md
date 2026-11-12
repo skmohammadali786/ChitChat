@@ -105,6 +105,8 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 
 ## Follow-up implementation after the audit
 
+- Security audit found that group creation/add-member RPCs checked profile existence but did not enforce `profiles.discoverable`. A caller who knew a UUID could bypass the username-lookup privacy gate. Fixed both private RPC implementations in Supabase migration `20261112191645_enforce_discoverable_group_members`; the deployed functions now reject new non-discoverable members while allowing existing group members to remain after opting out. The migration is committed to the branch. Supabase security advisor returned no lints after the change.
+
 - Added per-user conversation preference loading and safe partial updates that preserve other preference columns.
 - Added long-press actions for pinning, muting for eight hours, and archiving conversations.
 - Pinned conversations sort first. Archived conversations are available in a dedicated inbox view and can be restored.
