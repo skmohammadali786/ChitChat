@@ -617,7 +617,7 @@ export default function App() {
     setProfileError("");
     void supabase
       .from("profiles")
-      .select("id, username, display_name, bio, avatar_url, discoverable")
+      .select("id, username, display_name, bio, avatar_path, discoverable")
       .eq("id", session.user.id)
       .maybeSingle()
       .then(({ data, error }) => {
