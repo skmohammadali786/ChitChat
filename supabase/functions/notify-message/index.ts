@@ -18,7 +18,7 @@ Deno.serve(
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
     try {
-      const senderId = context.userClaims?.sub;
+      const senderId = context.userClaims?.id;
       if (!senderId) return json({ error: "Authentication required." }, 401);
 
       const input = await request.json().catch(() => ({})) as NotifyRequest;
