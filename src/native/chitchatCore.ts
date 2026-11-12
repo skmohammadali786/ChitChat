@@ -8,9 +8,9 @@ type CoreModule = {
 const nativeCore = NativeModules.ChitChatCore as CoreModule | undefined;
 
 /**
- * Rust bridge contract. Native implementations are provided by the Android
- * UniFFI/JNI and iOS Swift bridge targets when the development client is built.
- * Expo Go does not contain this custom native module.
+ * Rust bridge contract. The Android and iOS native module implementations
+ * have not been linked yet. When they are added, they must register this
+ * module name and match the typed methods below. Expo Go cannot load it.
  */
 export const chitchatCore = {
   get available(): boolean {
