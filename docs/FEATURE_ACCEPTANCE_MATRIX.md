@@ -41,11 +41,11 @@ Legend:
 | Feature | Status | Acceptance requirement |
 |---|---|---|
 | Whole-message concealment | PARTIAL | Secret payload encrypted and stored with recipient reveal preference |
-| Concealed text sections | NOT STARTED | Segment format encrypted inside the message payload |
+| Concealed text sections | PARTIAL | Rust message-content model supports ordered Unicode text blocks and concealed flags; MLS encryption and reveal UI integration remain |
 | Automatic reveal | PARTIAL | Recipient-controlled setting, animation and reduced-motion behavior |
 | Manual reveal | PARTIAL | Explicit tap and accessibility support |
 | Re-hide | PARTIAL | Hide decrypted UI and clear temporary buffers where technically possible |
-| Secret photos/videos/audio/files | NOT STARTED | Encrypt before upload, R2 storage, authenticated retrieval, decrypt after download |
+| Secret photos/videos/audio/files | PARTIAL | Rust content model supports encrypted-media references and concealed attachments; file encryption, key wrapping, picker and decrypt path remain |
 | Screenshot/screen-recording claims | NOT STARTED | Document platform limitations; never promise impossible prevention |
 
 ## Media and storage
@@ -59,7 +59,7 @@ Legend:
 | Image/video/audio/file picker | NOT STARTED | Native pickers, size limits, upload progress and retry |
 | Large media | NOT STARTED | Resumable/multipart upload, pause/resume and cleanup |
 | Media expiry and cleanup | NOT STARTED | Delete expired R2 objects and Supabase metadata safely |
-| Emoji in messages | PARTIAL | Unicode payload support; include emoji in encrypted message content |
+| Emoji in messages | PARTIAL | Rust payload model preserves Unicode/emoji text; MLS encryption and real message transport remain |
 | Emoji reactions | PARTIAL | Database supports selected emoji values; UI and realtime behavior remain |
 
 ## Delivery, reliability and notifications
