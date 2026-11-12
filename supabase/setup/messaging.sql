@@ -124,6 +124,7 @@ create policy "messages_insert_as_self_member"
   to authenticated
   with check (
     sender_id = (select auth.uid())
+    and message_type <> 'system'
     and public.is_conversation_member(conversation_id)
   );
 
@@ -173,9 +174,12 @@ begin
   end if;
 
   if not exists (
-    select 1 from public.profiles as profile_row where profile_row.id = target_user_id
+    select 1
+    from public.profiles as profile_row
+    where profile_row.id = target_user_id
+      and profile_row.discoverable = true
   ) then
-    raise exception 'That profile does not exist' using errcode = 'P0002';
+    raise exception 'That account is not available for username discovery' using errcode = 'P0002';
   end if;
 
   -- Serialize direct-chat creation for the same pair to avoid duplicate DMs.
