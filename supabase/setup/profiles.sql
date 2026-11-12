@@ -29,6 +29,7 @@ create policy profiles_update_own on public.profiles for update to authenticated
 
 create schema if not exists private;
 revoke all on schema private from public,anon,authenticated;
+grant usage on schema private to authenticated;
 
 create table if not exists private.profile_search_events(
   id bigint generated always as identity primary key,
