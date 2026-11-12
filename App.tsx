@@ -11,7 +11,7 @@ import { AuthScreen } from "./src/features/auth/AuthScreen";
 import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
 import { ProfileSetupScreen } from "./src/features/auth/ProfileSetupScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
-import type { DiscoverableProfile } from "./src/features/messaging/service";
+import { loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 
@@ -36,8 +36,9 @@ const seedMessages: Message[] = [
 function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
-  const [chats, setChats] = useState<Chat[]>(initialChats);
+  const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
   const [search, setSearch] = useState("");
@@ -54,6 +55,42 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   };
 
   const filteredChats = useMemo(() => chats.filter(x => x.name.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+
+  useEffect(() => {
+    if (!profile || !supabase) return;
+    let active = true;
+    setConversationLoadError("");
+    void loadMyConversations().then(rows => {
+      if (!active) return;
+      const loadedChats: Chat[] = rows.map(row => {
+        const displayName = row.conversation_kind === "group"
+          ? row.conversation_title ?? "Group conversation"
+          : row.other_display_name ?? row.other_username ?? "Conversation";
+        const initials = displayName.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+        return {
+          id: row.conversation_id,
+          name: displayName,
+          initials: initials || "CH",
+          color: "#D8D1FF",
+          message: "Secure messaging setup in progress",
+          time: new Date(row.updated_at).toLocaleDateString(),
+          unread: 0,
+          isReal: true,
+          conversationId: row.conversation_id,
+          remoteUserId: row.other_user_id ?? undefined,
+        };
+      });
+      setChats(old => {
+        const merged = new Map<string, Chat>();
+        for (const chat of loadedChats) merged.set(chat.id, chat);
+        for (const chat of old) if (!merged.has(chat.id)) merged.set(chat.id, chat);
+        return [...merged.values()];
+      });
+    }).catch(caught => {
+      if (active) setConversationLoadError(caught instanceof Error ? caught.message : "Could not load conversations.");
+    });
+    return () => { active = false; };
+  }, [profile?.id]);
 
   useEffect(() => {
     setDiscoveryEnabled(profile?.discoverable ?? false);
@@ -215,7 +252,16 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
                 </View>
               </Pressable>
             )}
-            ListEmptyComponent={<Text style={{ color: c.muted, textAlign: "center", marginTop: 48 }}>No conversations found.</Text>}
+            ListEmptyComponent={
+              <View style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 48 }}>
+                <Text style={{ color: c.text, fontSize: 15, fontWeight: "800" }}>{search ? "No matching conversations" : "Your inbox is empty"}</Text>
+                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 }}>Start with a username. ChitChat only returns profiles that allow discovery.</Text>
+                <Pressable accessibilityRole="button" onPress={() => setShowNewChat(true)} style={{ backgroundColor: palette.brand, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.md, marginTop: 16 }}>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 12 }}>Find someone</Text>
+                </Pressable>
+                {conversationLoadError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, textAlign: "center", marginTop: 12 }}>{conversationLoadError}</Text> : null}
+              </View>
+            }
           />
         </>
       ) : tab === "Calls" ? (
