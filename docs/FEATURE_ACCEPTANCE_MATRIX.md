@@ -81,7 +81,7 @@ Legend:
 | Report message/user | PARTIAL | Private report table exists; reporting UI, abuse triage and rate limits |
 | App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
-| Notification privacy | NOT STARTED | Hide content and secret-message previews |
+| Notification privacy | PARTIAL | User can disable alerts or show sender only; push payloads never include message text. Device lock-screen behavior and push delivery tests remain |
 | Last seen/read receipts privacy | PARTIAL | Read receipt, online, typing and last-seen controls are wired to Supabase; read receipt UI and cross-device tests remain |
 | Contact permissions | NOT STARTED | Optional OS permission and privacy-safe discovery |
 | Spam and abuse controls | PARTIAL | Username lookup throttling exists; message, media and invite controls remain |
