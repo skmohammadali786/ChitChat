@@ -10,7 +10,7 @@ import { supabase } from "../../lib/supabase";
 type Props = { onContinueDemo: () => void };
 
 export function AuthScreen({ onContinueDemo }: Props) {
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signup");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -28,11 +28,11 @@ export function AuthScreen({ onContinueDemo }: Props) {
       setError("Enter a valid email address.");
       return;
     }
-    if (password.length < 8) {
+    if (!isReset && password.length < 8) {
       setError("Use a password with at least 8 characters.");
       return;
     }
-    if (mode === "signup") {
+    if (isSignup) {
       const cleanUsername = username.trim().toLowerCase();
       if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
         setError("Username must be 3 to 20 characters. Use letters, numbers, and underscores.");
@@ -50,7 +50,13 @@ export function AuthScreen({ onContinueDemo }: Props) {
 
     setBusy(true);
     try {
-      if (mode === "signup") {
+      if (isReset) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: Linking.createURL("auth/callback"),
+        });
+        if (resetError) throw resetError;
+        setNotice("If an account exists for this email, a password reset link will arrive shortly.");
+      } else if (isSignup) {
         const { data, error: authError } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
@@ -84,6 +90,7 @@ export function AuthScreen({ onContinueDemo }: Props) {
   }
 
   const isSignup = mode === "signup";
+  const isReset = mode === "reset";
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -94,10 +101,10 @@ export function AuthScreen({ onContinueDemo }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.eyebrow}>{isSignup ? "YOUR PRIVATE SPACE" : "WELCOME BACK"}</Text>
-          <Text style={styles.title}>{isSignup ? "Make room for real conversations." : "Good to see you again."}</Text>
+          <Text style={styles.eyebrow}>{isSignup ? "YOUR PRIVATE SPACE" : isReset ? "ACCOUNT RECOVERY" : "WELCOME BACK"}</Text>
+          <Text style={styles.title}>{isSignup ? "Make room for real conversations." : isReset ? "Get back into your account." : "Good to see you again."}</Text>
           <Text style={styles.description}>
-            {isSignup ? "Create your account and choose a username people can find you by." : "Sign in to pick up where your conversations left off."}
+            {isSignup ? "Create your account and choose a username people can find you by." : isReset ? "Enter your email and we will send a secure password reset link." : "Sign in to pick up where your conversations left off."}
           </Text>
 
           {isSignup ? (
@@ -114,8 +121,12 @@ export function AuthScreen({ onContinueDemo }: Props) {
 
           <Text style={styles.label}>Email</Text>
           <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={palette.muted} style={styles.field} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" returnKeyType="next" />
-          <Text style={styles.label}>Password</Text>
-          <TextInput value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor={palette.muted} style={styles.field} secureTextEntry autoCapitalize="none" textContentType={isSignup ? "newPassword" : "password"} returnKeyType="done" onSubmitEditing={submit} />
+          {!isReset ? (
+            <>
+              <Text style={styles.label}>Password</Text>
+              <TextInput value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor={palette.muted} style={styles.field} secureTextEntry autoCapitalize="none" textContentType={isSignup ? "newPassword" : "password"} returnKeyType="done" onSubmitEditing={submit} />
+            </>
+          ) : null}
 
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
@@ -124,10 +135,15 @@ export function AuthScreen({ onContinueDemo }: Props) {
             {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isSignup ? "Create account" : "Sign in"}</Text>}
           </Pressable>
 
+          {mode === "signin" ? (
+            <Pressable onPress={() => { setMode("reset"); setError(""); setNotice(""); }} style={{ alignSelf: "center", paddingTop: spacing.md }}>
+              <Text style={styles.switchAction}>Forgot password?</Text>
+            </Pressable>
+          ) : null}
           <View style={styles.switchRow}>
-            <Text style={styles.switchText}>{isSignup ? "Already have an account?" : "New to ChitChat?"}</Text>
-            <Pressable onPress={() => { setMode(isSignup ? "signin" : "signup"); setError(""); setNotice(""); }}>
-              <Text style={styles.switchAction}>{isSignup ? " Sign in" : " Create account"}</Text>
+            <Text style={styles.switchText}>{isSignup ? "Already have an account?" : isReset ? "Remembered your password?" : "New to ChitChat?"}</Text>
+            <Pressable onPress={() => { setMode(isSignup || isReset ? "signin" : "signup"); setError(""); setNotice(""); }}>
+              <Text style={styles.switchAction}>{isSignup || isReset ? " Sign in" : " Create account"}</Text>
             </Pressable>
           </View>
         </View>
