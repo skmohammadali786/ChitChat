@@ -1,6 +1,6 @@
 import { supabase } from "../../lib/supabase";
 
-export type EncryptedMessageType = "text" | "image" | "video" | "audio" | "file" | "system";
+export type EncryptedMessageType = "text" | "image" | "video" | "audio" | "file";
 
 /**
  * A message envelope. The actual encryption and decryption must be performed
@@ -33,7 +33,7 @@ function requireClient() {
 }
 
 function validateEnvelope(envelope: EncryptedMessageEnvelope): void {
-  const supportedTypes: EncryptedMessageType[] = ["text", "image", "video", "audio", "file", "system"];
+  const supportedTypes: EncryptedMessageType[] = ["text", "image", "video", "audio", "file"];
   if (!supportedTypes.includes(envelope.message_type)) {
     throw new Error("The encrypted message type is not supported.");
   }
