@@ -26,3 +26,6 @@ The database stores message envelopes containing ciphertext, nonce, cryptographi
 
 ## Cloudflare media storage
 See [Cloudflare R2 media storage](CLOUDFLARE_MEDIA.md). The private `chitchat-media` R2 bucket is accessed through the authenticated `chitchat-media-api` Worker. Supabase stores metadata and enforces conversation membership through RLS.
+
+## Push notifications
+The `notify-message` Edge Function is deployed with JWT verification enabled. It sends generic alerts only, never message plaintext or encryption keys. The Expo app needs `EXPO_PUBLIC_EAS_PROJECT_ID` configured after `eas init` before token registration can work. Expo push credentials and real-device delivery still need setup and verification.
