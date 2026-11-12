@@ -30,7 +30,7 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-function MainApp({ profile, onSignOut }: { profile?: ChitChatProfile | null; onSignOut?: () => void }) {
+function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [search, setSearch] = useState("");
@@ -162,6 +162,11 @@ function MainApp({ profile, onSignOut }: { profile?: ChitChatProfile | null; onS
             <View style={[styles.infoCard, { backgroundColor: dark ? "#202B35" : "#EAF6EF", marginBottom: spacing.xl }]}>
               <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontWeight: "800", fontSize: 13 }}>Demo mode</Text>
               <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 12, lineHeight: 18, marginTop: 5 }}>These conversations use local sample data. Connect a ChitChat Supabase project to enable accounts and cloud sync.</Text>
+              {onExitDemo ? (
+                <Pressable accessibilityRole="button" onPress={onExitDemo} style={{ alignSelf: "flex-start", paddingTop: 12 }}>
+                  <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign in to your account</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
           <Text style={[styles.sectionTitle, { color: c.text, marginBottom: spacing.lg }]}>Your experience</Text>
@@ -356,7 +361,8 @@ export default function App() {
     setSession(null);
   }
 
-  if (!isSupabaseConfigured || demoMode) return <MainApp profile={null} />;
+  if (!isSupabaseConfigured) return <MainApp profile={null} />;
+  if (demoMode) return <MainApp profile={null} onExitDemo={() => setDemoMode(false)} />;
   if (!authReady || profileLoading) return <AppBootScreen />;
   if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
