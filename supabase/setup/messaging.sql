@@ -8,10 +8,10 @@
 -- and prevents new direct-message delivery in either direction.
 create table if not exists public.user_blocks (
   blocker_id uuid not null references auth.users (id) on delete cascade,
-  blocked_user_id uuid not null references auth.users (id) on delete cascade,
+  blocked_id uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (blocker_id, blocked_user_id),
-  constraint user_blocks_no_self check (blocker_id <> blocked_user_id)
+  primary key (blocker_id, blocked_id),
+  constraint user_blocks_no_self check (blocker_id <> blocked_id)
 );
 
 alter table public.user_blocks enable row level security;
@@ -28,7 +28,7 @@ create policy "user_blocks_insert_own"
   on public.user_blocks for insert to authenticated
   with check (
     blocker_id = (select auth.uid())
-    and blocked_user_id <> (select auth.uid())
+    and blocked_id <> (select auth.uid())
   );
 
 drop policy if exists "user_blocks_delete_own" on public.user_blocks;
@@ -137,10 +137,10 @@ as $$
       join public.user_blocks as block_row
         on (
           block_row.blocker_id = candidate_sender_id
-          and block_row.blocked_user_id = other_member.user_id
+          and block_row.blocked_id = other_member.user_id
         ) or (
           block_row.blocker_id = other_member.user_id
-          and block_row.blocked_user_id = candidate_sender_id
+          and block_row.blocked_id = candidate_sender_id
         )
       where conversation_row.id = target_conversation_id
         and conversation_row.kind = 'direct'
@@ -255,8 +255,8 @@ begin
   if exists (
     select 1
     from public.user_blocks as block_row
-    where (block_row.blocker_id = caller_id and block_row.blocked_user_id = target_user_id)
-       or (block_row.blocker_id = target_user_id and block_row.blocked_user_id = caller_id)
+    where (block_row.blocker_id = caller_id and block_row.blocked_id = target_user_id)
+       or (block_row.blocker_id = target_user_id and block_row.blocked_id = caller_id)
   ) then
     raise exception 'This conversation is not available' using errcode = '42501';
   end if;
@@ -360,7 +360,7 @@ returns table (
   other_user_id uuid,
   other_username text,
   other_display_name text,
-  other_avatar_url text
+  other_avatar_path text
 )
 language plpgsql
 stable
@@ -383,7 +383,7 @@ begin
       other_member.user_id,
       other_profile.username,
       other_profile.display_name,
-      other_profile.avatar_url
+      other_profile.avatar_path
     from public.conversations as conversation_row
     join public.conversation_members as my_membership
       on my_membership.conversation_id = conversation_row.id
@@ -414,7 +414,7 @@ returns table (
   id uuid,
   username text,
   display_name text,
-  avatar_url text
+  avatar_path text
 )
 language plpgsql
 security definer
@@ -458,7 +458,7 @@ begin
   values (v_requester_id);
 
   return query
-    select profile_row.id, profile_row.username, profile_row.display_name, profile_row.avatar_url
+    select profile_row.id, profile_row.username, profile_row.display_name, profile_row.avatar_path
     from public.profiles as profile_row
     where lower(profile_row.username) = v_normalized_username
       and profile_row.discoverable = true
@@ -466,8 +466,8 @@ begin
       and not exists (
         select 1
         from public.user_blocks as block_row
-        where (block_row.blocker_id = v_requester_id and block_row.blocked_user_id = profile_row.id)
-           or (block_row.blocker_id = profile_row.id and block_row.blocked_user_id = v_requester_id)
+        where (block_row.blocker_id = v_requester_id and block_row.blocked_id = profile_row.id)
+           or (block_row.blocker_id = profile_row.id and block_row.blocked_id = v_requester_id)
       )
     limit 1;
 end;
@@ -478,10 +478,10 @@ grant execute on function public.lookup_profile_by_username(text) to authenticat
 
 create or replace function public.list_my_blocks()
 returns table (
-  blocked_user_id uuid,
+  blocked_id uuid,
   username text,
   display_name text,
-  avatar_url text,
+  avatar_path text,
   blocked_at timestamptz
 )
 language plpgsql
@@ -498,14 +498,14 @@ begin
 
   return query
     select
-      block_row.blocked_user_id,
+      block_row.blocked_id,
       profile_row.username,
       profile_row.display_name,
-      profile_row.avatar_url,
+      profile_row.avatar_path,
       block_row.created_at
     from public.user_blocks as block_row
     left join public.profiles as profile_row
-      on profile_row.id = block_row.blocked_user_id
+      on profile_row.id = block_row.blocked_id
     where block_row.blocker_id = v_requester_id
     order by block_row.created_at desc
     limit 200;
