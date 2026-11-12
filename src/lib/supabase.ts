@@ -22,7 +22,7 @@ type SessionStorage = {
  * partially completed write never becomes the active session.
  */
 class SecureSessionStorage implements SessionStorage {
-  private readonly chunkSize = 600;
+  private readonly chunkSize = 400;
 
   private baseKey(key: string): string {
     return `chitchat.${key.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
