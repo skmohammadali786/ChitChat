@@ -4,7 +4,13 @@ export type PresenceMember = {
   user_id: string;
   online: boolean;
   typing: boolean;
-  last_active_at: string;
+  last_active_at?: string;
+};
+
+export type PresencePrivacy = {
+  showOnlineStatus: boolean;
+  showTypingStatus: boolean;
+  showLastSeen: boolean;
 };
 
 export function subscribeToConversationPresence(
@@ -12,6 +18,11 @@ export function subscribeToConversationPresence(
   userId: string,
   onPresence: (members: Record<string, PresenceMember[]>) => void,
   onTyping: (payload: { userId: string; typing: boolean }) => void,
+  privacy: PresencePrivacy = {
+    showOnlineStatus: true,
+    showTypingStatus: true,
+    showLastSeen: true,
+  },
 ) {
   if (!supabase) throw new Error("Supabase is not configured.");
   const channel = supabase.channel(`conversation:${conversationId}`, {
@@ -28,29 +39,34 @@ export function subscribeToConversationPresence(
     });
 
   void supabase.realtime.setAuth().then(() => channel.subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        void channel.track({
-          user_id: userId,
-          online: true,
-          typing: false,
-          last_active_at: new Date().toISOString(),
-        } satisfies PresenceMember);
-      }
-    }));
+    if (status === "SUBSCRIBED" && privacy.showOnlineStatus) {
+      const state: PresenceMember = {
+        user_id: userId,
+        online: true,
+        typing: false,
+        ...(privacy.showLastSeen ? { last_active_at: new Date().toISOString() } : {}),
+      };
+      void channel.track(state);
+    }
+  }));
 
   return {
     async setTyping(typing: boolean) {
+      if (!privacy.showTypingStatus) return;
       await channel.send({
         type: "broadcast",
         event: "typing",
         payload: { userId, typing },
       });
-      await channel.track({
-        user_id: userId,
-        online: true,
-        typing,
-        last_active_at: new Date().toISOString(),
-      } satisfies PresenceMember);
+      if (privacy.showOnlineStatus) {
+        const state: PresenceMember = {
+          user_id: userId,
+          online: true,
+          typing,
+          ...(privacy.showLastSeen ? { last_active_at: new Date().toISOString() } : {}),
+        };
+        await channel.track(state);
+      }
     },
     async stop() {
       await channel.untrack();
