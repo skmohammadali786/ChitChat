@@ -71,7 +71,7 @@ export function validateMessageContentShape(content: MessageContent): void {
 
     if (block.type !== "media" ||
         !/^[0-9a-f-]{36}$/i.test(block.object_id) ||
-        !/^[A-Za-z0-9_-]{43}$/.test(block.file_key) ||
+        !/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/.test(block.file_key) ||
         !Number.isInteger(block.crypto_version) || block.crypto_version < 1 ||
         !/^[a-f0-9]{64}$/.test(block.sha256) ||
         !Number.isInteger(block.size_bytes) || block.size_bytes < 1 ||
