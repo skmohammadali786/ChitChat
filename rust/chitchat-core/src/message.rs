@@ -155,15 +155,17 @@ pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
                     && file_key
                         .bytes()
                         .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
-                    && file_key.as_bytes().last().is_some_and(|last| {
-                        match last {
-                            b'A'..=b'Z' => (last - b'A') % 4 == 0,
-                            b'a'..=b'z' => (last - b'a' + 26) % 4 == 0,
-                            b'0'..=b'9' => (last - b'0' + 52) % 4 == 0,
-                            b'-' | b'_' => false,
-                            _ => false,
-                        }
-                    });
+                    && file_key.as_bytes().last().map(|last| {
+                        let value = match *last {
+                            b'A'..=b'Z' => *last - b'A',
+                            b'a'..=b'z' => *last - b'a' + 26,
+                            b'0'..=b'9' => *last - b'0' + 52,
+                            b'-' => 62,
+                            b'_' => 63,
+                            _ => 255,
+                        };
+                        value % 4 == 0
+                    }).unwrap_or(false);
                 let valid_digest = sha256.len() == 64
                     && sha256
                         .bytes()
