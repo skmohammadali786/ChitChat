@@ -18,7 +18,7 @@ export function ProfileSetupScreen({ user, onSaved, onSignOut }: Props) {
   const [displayName, setDisplayName] = useState(String(metadata.display_name ?? metadata.full_name ?? ""));
   const [username, setUsername] = useState(String(metadata.username ?? "").toLowerCase());
   const [bio, setBio] = useState("");
-  const [discoverable, setDiscoverable] = useState(true);
+  const [discoverable, setDiscoverable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -52,7 +52,7 @@ export function ProfileSetupScreen({ user, onSaved, onSignOut }: Props) {
       const { data, error: saveError } = await supabase
         .from("profiles")
         .upsert(payload, { onConflict: "id" })
-        .select("id, username, display_name, bio, avatar_url, discoverable")
+        .select("id, username, display_name, bio, avatar_path, discoverable")
         .single();
 
       if (saveError) {
