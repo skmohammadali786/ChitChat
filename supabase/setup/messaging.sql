@@ -137,10 +137,22 @@ create policy "messages_delete_own"
 -- Least-privilege Data API access. RLS still decides which rows are visible.
 grant usage on schema public to authenticated;
 revoke all on table public.conversations, public.conversation_members, public.messages from anon, public;
-grant select, update on table public.conversations to authenticated;
+grant select on table public.conversations to authenticated;
+grant update (title) on table public.conversations to authenticated;
 grant select on table public.conversation_members to authenticated;
 grant update (last_read_at) on table public.conversation_members to authenticated;
-grant select, insert, delete on table public.messages to authenticated;
+grant select, delete on table public.messages to authenticated;
+grant insert (
+  conversation_id,
+  sender_id,
+  client_message_id,
+  message_type,
+  ciphertext,
+  nonce,
+  crypto_header,
+  key_version,
+  expires_at
+) on table public.messages to authenticated;
 
 create or replace function public.create_direct_conversation(target_user_id uuid)
 returns uuid
@@ -212,6 +224,30 @@ $$;
 
 revoke all on function public.create_direct_conversation(uuid) from public, anon;
 grant execute on function public.create_direct_conversation(uuid) to authenticated;
+
+
+-- Bump a conversation's ordering timestamp only after an authorized message
+-- insert. The trigger function is not directly executable by app roles.
+create or replace function public.touch_conversation_after_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+begin
+  update public.conversations
+     set updated_at = now()
+   where id = new.conversation_id;
+  return new;
+end;
+$;
+
+revoke all on function public.touch_conversation_after_message() from public, anon, authenticated;
+
+drop trigger if exists messages_touch_conversation on public.messages;
+create trigger messages_touch_conversation
+  after insert on public.messages
+  for each row execute function public.touch_conversation_after_message();
 
 -- Enable INSERT events for Supabase Realtime exactly once.
 do $$
