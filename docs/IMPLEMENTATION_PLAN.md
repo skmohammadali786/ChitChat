@@ -2,12 +2,15 @@
 
 ## Completed in the foundation
 - Expo, React Native, TypeScript app shell.
+- EAS preview APK and production AAB profiles.
 - Astryx-informed semantic tokens and component conventions.
 - Chat list, local demo conversation, composer, secret reveal/re-hide UI, and light/dark appearance.
 - Supabase email/password sign-up, sign-in, email confirmation callbacks, password reset, and session persistence.
 - Mobile auth sessions stored through Expo SecureStore, web sessions stored through IndexedDB-backed AsyncStorage.
 - Profile onboarding, unique usernames, bio, and opt-in username discovery.
 - Exact username lookup with a private server-side rate-limit table.
+- User block/unblock with block-list management, discovery filtering, and direct-message delivery checks.
+- Profile editing for display name, username, and bio.
 - Direct conversation creation and current-user conversation listing RPCs.
 - Conversation/member/message schema with row-level security and ciphertext-only message fields.
 - Realtime publication setup for new message records.
@@ -24,6 +27,7 @@
 - Add device registration and account recovery design.
 
 ## Phase 3: secure messaging
+- Complete a contained evaluation of the OpenE2EE Signal Protocol SDK and compare it with other viable implementations. It is not independently audited and is not selected for production.
 - Select and integrate a reviewed protocol/library that supports Android, iOS, React Native 0.88, and Hermes.
 - Device identity keys, prekeys, key changes, verification, recovery, and multi-device strategy.
 - Define encrypted attachments, secret-message payload format, expiry, and local cache lifecycle.
