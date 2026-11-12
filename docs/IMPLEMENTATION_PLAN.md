@@ -24,6 +24,10 @@
 - Add device registration and account recovery design.
 
 ## Phase 3: secure messaging
+- Implement the OpenMLS 0.9.2 wrapper crate and versioned UniFFI interface.
+- Add device credentials, key-package publication, device verification and encrypted local MLS state.
+- Replace the generic message nonce envelope with validated MLS wire-format metadata.
+- Add cross-platform direct and group messaging vectors before enabling the composer.
 - Select and integrate a reviewed protocol/library that supports Android, iOS, React Native 0.88, and Hermes.
 - Device identity keys, prekeys, key changes, verification, recovery, and multi-device strategy.
 - Define encrypted attachments, secret-message payload format, expiry, and local cache lifecycle.
