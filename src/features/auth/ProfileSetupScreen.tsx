@@ -18,6 +18,7 @@ export function ProfileSetupScreen({ user, onSaved, onSignOut }: Props) {
   const [displayName, setDisplayName] = useState(String(metadata.display_name ?? metadata.full_name ?? ""));
   const [username, setUsername] = useState(String(metadata.username ?? "").toLowerCase());
   const [bio, setBio] = useState("");
+  const [discoverable, setDiscoverable] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,11 +47,12 @@ export function ProfileSetupScreen({ user, onSaved, onSignOut }: Props) {
         username: cleanUsername,
         display_name: cleanDisplayName,
         bio: bio.trim().slice(0, 160),
+        discoverable,
       };
       const { data, error: saveError } = await supabase
         .from("profiles")
         .upsert(payload, { onConflict: "id" })
-        .select("id, username, display_name, bio, avatar_url")
+        .select("id, username, display_name, bio, avatar_url, discoverable")
         .single();
 
       if (saveError) {
@@ -86,6 +88,21 @@ export function ProfileSetupScreen({ user, onSaved, onSignOut }: Props) {
         <Text style={styles.label}>A little about you <Text style={styles.optional}>(optional)</Text></Text>
         <TextInput value={bio} onChangeText={setBio} placeholder="A short line about yourself" placeholderTextColor={palette.muted} style={[styles.field, styles.bio]} multiline maxLength={160} textAlignVertical="top" />
         <Text style={styles.counter}>{bio.length}/160</Text>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: discoverable }}
+          onPress={() => setDiscoverable(value => !value)}
+          style={styles.discoveryRow}
+        >
+          <View style={[styles.checkbox, discoverable && styles.checkboxSelected]}>
+            {discoverable ? <Text style={styles.checkmark}>✓</Text> : null}
+          </View>
+          <View style={styles.discoveryCopy}>
+            <Text style={styles.discoveryTitle}>Let people find me by username</Text>
+            <Text style={styles.discoveryHint}>Only your username, display name, and profile photo can appear in exact username lookup. Your email stays private.</Text>
+          </View>
+        </Pressable>
+
 
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <Pressable accessibilityRole="button" disabled={busy} onPress={save} style={[styles.primary, busy && styles.disabled]}>
@@ -116,6 +133,13 @@ const styles = StyleSheet.create({
   usernameInput: { flex: 1, color: palette.ink, fontSize: 14, paddingVertical: 0 },
   bio: { minHeight: 92, paddingTop: 13 },
   counter: { color: palette.muted, fontSize: 10, textAlign: "right", marginTop: 5 },
+  discoveryRow: { flexDirection: "row", alignItems: "flex-start", gap: 11, marginTop: spacing.xl },
+  checkbox: { width: 21, height: 21, borderRadius: 6, borderWidth: 1.5, borderColor: "#C8CBD5", alignItems: "center", justifyContent: "center", marginTop: 1 },
+  checkboxSelected: { backgroundColor: palette.brand, borderColor: palette.brand },
+  checkmark: { color: "#FFFFFF", fontWeight: "900", fontSize: 14, lineHeight: 17 },
+  discoveryCopy: { flex: 1 },
+  discoveryTitle: { color: palette.inkSoft, fontSize: 12, fontWeight: "700" },
+  discoveryHint: { color: palette.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
   primary: { minHeight: 50, borderRadius: radius.md, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center", marginTop: spacing.xl },
   primaryText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
   disabled: { opacity: 0.65 },
