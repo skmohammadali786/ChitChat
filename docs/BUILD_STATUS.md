@@ -1,6 +1,7 @@
 # ChitChat build and integration status
 
 ## Configured
+- Rust core now defines a versioned structured message payload with Unicode text, concealed segments, and encrypted-media references. Validation tests cover emoji, concealed text, and media metadata. These tests have been authored but not yet executed in CI.
 - Deployed authenticated Supabase Edge Function `notify-message` with JWT verification. It sends generic Expo push alerts only, checks message ownership and conversation recipients, honors notification-preview opt-out and revokes unregistered Expo tokens.
 - Settings UI can request notification permission and register Expo push tokens. It requires `EXPO_PUBLIC_EAS_PROJECT_ID`, which must be filled after linking the Expo project.\n- Private Cloudflare R2 bucket `chitchat-media` in APAC Standard storage.\n- Deployed `chitchat-media-api` Worker with an R2 binding and Supabase JWT verification.\n- Public `r2.dev` access is disabled; unauthenticated Worker requests return an authentication error.\n- Supabase `media_objects` metadata table with RLS and crypto-version metadata.
 - Group create/list/add/remove/rename/transfer-owner RPCs with server-side membership and role checks.
