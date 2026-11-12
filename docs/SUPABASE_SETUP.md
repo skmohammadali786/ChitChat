@@ -1,6 +1,6 @@
 # ChitChat Supabase setup
 
-ChitChat currently uses Supabase Auth for email/password accounts and Postgres for private profile records. The repository does not create or select a hosted Supabase project automatically.
+ChitChat currently uses Supabase Auth for email/password accounts and Postgres for private profile records. Mobile auth sessions are persisted through Expo SecureStore. Web uses a separate IndexedDB-backed storage adapter. The repository does not create or select a hosted Supabase project automatically.
 
 ## 1. Create a dedicated Supabase project
 Create a new project named `ChitChat` in your Supabase organization. Do not reuse Momently or MT Learning. For users primarily in India, Mumbai (`ap-south-1`) is a sensible starting region. Choose a region based on where your first users will be located.
@@ -30,7 +30,7 @@ EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 ```
 
-Only the publishable client key belongs in the mobile app. Never add a `service_role` key or an `sb_secret_` key to an Expo public environment variable or commit it to Git.
+Only the publishable client key belongs in the mobile app. Never add a `service_role` key or an `sb_secret_` key to an Expo public environment variable or commit it to Git. On Android and iOS, the Supabase session is stored in Expo SecureStore. The storage adapter splits larger session values into smaller secure chunks because some iOS Keychain versions reject large individual values.
 
 Restart Expo after changing environment variables.
 
