@@ -56,6 +56,24 @@ export async function disablePushNotifications(): Promise<void> {
   await Notifications.unregisterForNotificationsAsync();
 }
 
+export async function syncPushRegistrationIfGranted(): Promise<boolean> {
+  const platform = nativePlatform();
+  const permission = await Notifications.getPermissionsAsync();
+  if (!permission.granted) return false;
+  const projectId = easProjectId();
+  const result = await Notifications.getExpoPushTokenAsync({ projectId });
+  await registerPushDevice(result.data, platform);
+  return true;
+}
+
+export async function revokeCurrentPushRegistration(): Promise<void> {
+  const permission = await Notifications.getPermissionsAsync();
+  if (!permission.granted) return;
+  const projectId = easProjectId();
+  const result = await Notifications.getExpoPushTokenAsync({ projectId });
+  await unregisterPushDevice(result.data);
+}
+
 export function listenForPushTokenChanges() {
   const platform = nativePlatform();
   const projectId = easProjectId();
