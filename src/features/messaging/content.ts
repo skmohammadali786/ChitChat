@@ -28,13 +28,22 @@ export type MessageContent = {
   blocks: MessageContentBlock[];
 };
 
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
+  }
+  return bytes;
+}
+
 export function createTextMessageContent(
   text: string,
   concealed = false,
 ): MessageContent {
   const value = text.trim();
   if (!value) throw new Error("Message text cannot be empty.");
-  if (new TextEncoder().encode(value).byteLength > 64 * 1024) {
+  if (utf8ByteLength(value) > 64 * 1024) {
     throw new Error("Message text exceeds the 64 KB content limit.");
   }
   return {
@@ -52,7 +61,7 @@ export function validateMessageContentShape(content: MessageContent): void {
   for (const block of content.blocks) {
     if (block.type === "text") {
       if (!block.text || block.text.includes("\0") ||
-          new TextEncoder().encode(block.text).byteLength > 64 * 1024) {
+          utf8ByteLength(block.text) > 64 * 1024) {
         throw new Error("A text block is empty or exceeds the content limit.");
       }
       continue;
