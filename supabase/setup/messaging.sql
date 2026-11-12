@@ -398,6 +398,13 @@ begin
     ) as other_member on true
     left join public.profiles as other_profile
       on other_profile.id = other_member.user_id
+    where conversation_row.kind <> 'direct'
+       or not exists (
+         select 1
+         from public.user_blocks as block_row
+         where (block_row.blocker_id = v_requester_id and block_row.blocked_user_id = other_member.user_id)
+            or (block_row.blocker_id = other_member.user_id and block_row.blocked_user_id = v_requester_id)
+       )
     order by conversation_row.updated_at desc
     limit 200;
 end;
