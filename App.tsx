@@ -30,7 +30,7 @@ const initialChats: Chat[] = [
 const seedMessages: Message[] = [
   { id: "m1", mine: false, text: "Hey! How has your day been?", time: "10:42" },
   { id: "m2", mine: true, text: "Pretty good. Finally got some time to work on ChitChat.", time: "10:43" },
-  { id: "m3", mine: false, text: "I have something for you 👀", time: "10:44", secret: true },
+  { id: "m3", mine: false, text: "I saved you the window seat. The view is beautiful, just like you said it would be.", time: "10:44", secret: true },
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
@@ -44,6 +44,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   const [discoveryError, setDiscoveryError] = useState("");
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
+  const [draftSecret, setDraftSecret] = useState(false);
   const [messages, setMessages] = useState<Message[]>(seedMessages);
   const [dark, setDark] = useState(false);
   const [autoReveal, setAutoReveal] = useState(false);
@@ -148,8 +149,9 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
   function sendMessage() {
     const value = draft.trim();
     if (!value) return;
-    setMessages(old => [...old, { id: String(Date.now()), mine: true, text: value, time: "now" }]);
+    setMessages(old => [...old, { id: String(Date.now()), mine: true, text: value, time: "now", secret: draftSecret }]);
     setDraft("");
+    setDraftSecret(false);
   }
 
   const Header = ({ title, subtitle, back, newAction }: { title: string; subtitle?: string; back?: () => void; newAction?: () => void }) => (
@@ -224,7 +226,7 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
                 {messages.map(message => (
               <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
                 <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
-                  {message.secret ? <SecretReveal text="I saved you the window seat. The view is beautiful, just like you said it would be." autoReveal={autoReveal} /> : <Text style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
+                  {message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
                   <Text style={[styles.messageTime, { color: message.mine ? "#E7E2FF" : c.muted }]}>{message.time}  {message.mine ? "✓✓" : ""}</Text>
                 </View>
               </View>
@@ -238,9 +240,17 @@ function MainApp({ profile, onSignOut, onExitDemo }: { profile?: ChitChatProfile
             </View>
           ) : (
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
-              <Pressable style={styles.attachButton}><Text style={{ fontSize: 23, color: c.muted }}>＋</Text></Pressable>
-              <TextInput value={draft} onChangeText={setDraft} placeholder="Write a message..." placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
-              <Pressable accessibilityRole="button" accessibilityLabel="Send message" onPress={sendMessage} style={styles.sendButton}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
+              <Pressable
+                accessibilityRole="switch"
+                accessibilityLabel="Conceal this message"
+                accessibilityState={{ checked: draftSecret }}
+                onPress={() => setDraftSecret(value => !value)}
+                style={[styles.secretToggle, draftSecret && styles.secretToggleOn]}
+              >
+                <Text style={[styles.secretToggleText, draftSecret && styles.secretToggleTextOn]}>✦</Text>
+              </Pressable>
+              <TextInput value={draft} onChangeText={setDraft} placeholder={draftSecret ? "Write a secret message..." : "Write a message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
+              <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={!draft.trim()} onPress={sendMessage} style={[styles.sendButton, !draft.trim() && { opacity: 0.55 }]}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
             </View>
           )}
         </KeyboardAvoidingView>
@@ -427,6 +437,10 @@ const styles = StyleSheet.create({
   messageTime: { fontSize: 10, textAlign: "right", marginTop: 5 },
   composer: { minHeight: 68, paddingHorizontal: spacing.md, paddingVertical: 10, borderTopWidth: 1, flexDirection: "row", alignItems: "center", gap: 9 },
   attachButton: { width: 34, alignItems: "center" },
+  secretToggle: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: "#F0F1F5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "transparent" },
+  secretToggleOn: { backgroundColor: "#EEEAFE", borderColor: "#DAD2FF" },
+  secretToggleText: { color: "#89919E", fontSize: 19, fontWeight: "800" },
+  secretToggleTextOn: { color: palette.brand },
   input: { flex: 1, height: 44, borderRadius: radius.pill, paddingHorizontal: 16, fontSize: 14 },
   sendButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" }
 });
