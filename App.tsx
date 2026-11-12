@@ -191,7 +191,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
     });
     return () => {
       active = false;
-      tokenSubscription?.remove();
+      pushSubscriptionRef.current?.remove();
       pushSubscriptionRef.current = null;
     };
   }, [profile?.id]);
