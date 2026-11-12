@@ -23,4 +23,6 @@ Only the publishable Supabase key belongs in the mobile app. Never place a servi
 
 ## Security boundary
 The database stores message envelopes containing ciphertext, nonce, cryptographic metadata, and key version. The Rust crate currently validates structure only. It does not encrypt, decrypt, authenticate a device, or establish an end-to-end secure session. Real conversation sending remains disabled until a reviewed protocol and native Rust bridge are implemented and verified on both platforms.
-\n## Cloudflare media storage\nSee [Cloudflare R2 media storage](CLOUDFLARE_MEDIA.md). The private `chitchat-media` R2 bucket is accessed through the authenticated `chitchat-media-api` Worker. Supabase stores metadata and enforces conversation membership through RLS.\n
+
+## Cloudflare media storage
+See [Cloudflare R2 media storage](CLOUDFLARE_MEDIA.md). The private `chitchat-media` R2 bucket is accessed through the authenticated `chitchat-media-api` Worker. Supabase stores metadata and enforces conversation membership through RLS.
