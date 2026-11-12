@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  typescript:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -33,3 +33,24 @@ jobs:
 
       - name: Expo project diagnostics
         run: npx expo-doctor
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Run Rust tests
+        run: cargo test --workspace
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Rust lints
+        run: cargo clippy --workspace --all-targets -- -D warnings
