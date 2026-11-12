@@ -1,6 +1,11 @@
 # ChitChat build and integration status
 
 ## Configured\n- Private Cloudflare R2 bucket `chitchat-media` in APAC Standard storage.\n- Deployed `chitchat-media-api` Worker with an R2 binding and Supabase JWT verification.\n- Public `r2.dev` access is disabled; unauthenticated Worker requests return an authentication error.\n- Supabase `media_objects` metadata table with RLS and crypto-version metadata.
+- Group create/list/add/remove/rename/transfer-owner RPCs with server-side membership and role checks.
+- Per-recipient delivery/read receipt rows, message-insert trigger, privacy-aware read RPCs and Realtime publication.
+- User privacy/theme settings, per-conversation pin/mute/archive settings and push-device token registry.
+- Encrypted scheduled-message envelope table and a verified `pg_cron` job that dispatches due rows once per minute.
+- Private Realtime authorization policies for conversation channels, including online and typing privacy controls.
 - Dedicated Supabase project URL and publishable client key.
 - Expo Android and iOS identifiers and deep-link scheme.
 - Rust workspace and platform-independent domain crate.
@@ -8,6 +13,9 @@
 - Rust bridge contract and fail-closed messaging guard.
 
 ## Not yet complete
+- Group, receipts, settings, scheduled-message and push-device client services are present but are not yet fully wired into the screen UI.
+- Scheduled messages are inserted by the database scheduler, but end-user scheduling and delivery flows still need Android/iOS integration tests.
+- Push notifications have token registration only. No push-delivery Edge Function is deployed.
 - Android JNI/UniFFI bridge implementation.
 - iOS Swift/UniFFI bridge implementation.
 - Native development builds for both platforms.
