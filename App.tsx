@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as Notifications from "expo-notifications";
 import {
   ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
@@ -41,7 +42,7 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void }) {
+function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; onNotificationHandled?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [showArchivedConversations, setShowArchivedConversations] = useState(false);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -309,6 +310,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated }: { profile
       if (presence) void presence.stop();
     };
   }, [profile?.id, activeChat?.conversationId, activeChat?.isReal, showOnlineStatus, showTypingStatus, showLastSeen]);
+
+  useEffect(() => {
+    if (!openConversationId) return;
+    const target = chats.find(chat => chat.conversationId === openConversationId);
+    if (!target) return;
+    setTab("Chats");
+    setShowArchivedConversations(Boolean(target.archivedAt));
+    setActiveChat(target);
+    onNotificationHandled?.();
+  }, [openConversationId, chats, onNotificationHandled]);
 
   useEffect(() => {
     setDiscoveryEnabled(profile?.discoverable ?? false);
@@ -924,6 +935,17 @@ export default function App() {
   const [profileError, setProfileError] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [notificationConversationId, setNotificationConversationId] = useState<string | null>(null);
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+
+  useEffect(() => {
+    if (!lastNotificationResponse) return;
+    const data = lastNotificationResponse.notification.request.content.data;
+    if (typeof data?.conversation_id === "string") {
+      setNotificationConversationId(data.conversation_id);
+    }
+    void Notifications.clearLastNotificationResponseAsync();
+  }, [lastNotificationResponse]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -1030,5 +1052,5 @@ export default function App() {
   if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
-  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} />;
+  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} onNotificationHandled={() => setNotificationConversationId(null)} />
 }
