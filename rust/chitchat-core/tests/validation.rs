@@ -112,3 +112,65 @@ fn rejects_non_object_crypto_header() {
     };
     assert_eq!(validate_envelope(&envelope), Err(CoreError::InvalidCryptoHeader));
 }
+
+#[test]
+fn validates_unicode_emoji_and_concealed_text_content() {
+    use chitchat_core::{MessageBlock, MessageContent, validate_message_content};
+    let content = MessageContent {
+        version: 1,
+        blocks: vec![
+            MessageBlock::Text {
+                text: "Hello 👋 🌍".into(),
+                concealed: false,
+            },
+            MessageBlock::Text {
+                text: "This is secret 🔐".into(),
+                concealed: true,
+            },
+        ],
+    };
+    assert_eq!(validate_message_content(&content), Ok(()));
+}
+
+#[test]
+fn validates_encrypted_media_reference() {
+    use chitchat_core::{MediaKind, MessageBlock, MessageContent, validate_message_content};
+    let content = MessageContent {
+        version: 1,
+        blocks: vec![MessageBlock::Media {
+            object_id: Uuid::new_v4(),
+            media_kind: MediaKind::Image,
+            file_key: "A".repeat(43),
+            crypto_version: 1,
+            sha256: "a".repeat(64),
+            size_bytes: 1024,
+            concealed: true,
+        }],
+    };
+    assert_eq!(validate_message_content(&content), Ok(()));
+}
+
+#[test]
+fn rejects_invalid_media_file_key() {
+    use chitchat_core::{MediaKind, MessageBlock, MessageContent, validate_message_content};
+    let content = MessageContent {
+        version: 1,
+        blocks: vec![MessageBlock::Media {
+            object_id: Uuid::new_v4(),
+            media_kind: MediaKind::File,
+            file_key: "not-a-valid-key".into(),
+            crypto_version: 1,
+            sha256: "a".repeat(64),
+            size_bytes: 1024,
+            concealed: false,
+        }],
+    };
+    assert_eq!(validate_message_content(&content), Err(CoreError::InvalidMediaAttachment));
+}
+
+#[test]
+fn rejects_empty_message_content() {
+    use chitchat_core::{MessageContent, validate_message_content};
+    let content = MessageContent { version: 1, blocks: vec![] };
+    assert_eq!(validate_message_content(&content), Err(CoreError::InvalidMessageContent));
+}
