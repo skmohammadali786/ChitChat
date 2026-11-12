@@ -245,7 +245,7 @@ export function subscribeToEncryptedMessages(
 ): () => void {
   const client = requireClient();
   const channel = client
-    .channel(`messages:${conversationId}`)
+    .channel(`conversation:${conversationId}`, { config: { private: true } })
     .on(
       "postgres_changes",
       {
@@ -255,8 +255,9 @@ export function subscribeToEncryptedMessages(
         filter: `conversation_id=eq.${conversationId}`,
       },
       payload => onInsert(payload.new as EncryptedMessageRecord)
-    )
-    .subscribe(status => onStatus?.(status));
+    );
+
+  void client.realtime.setAuth().then(() => channel.subscribe(status => onStatus?.(status)));
 
   return () => {
     void client.removeChannel(channel);
