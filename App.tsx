@@ -47,7 +47,7 @@ const seedMessages: Message[] = [
 
 function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; onNotificationHandled?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
-  const [showArchivedConversations, setShowArchivedConversations] = useState(false);
+  const [conversationListMode, setConversationListMode] = useState<"inbox" | "archived" | "hidden">("inbox");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [chats, setChats] = useState<Chat[]>(profile ? [] : initialChats);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -189,7 +189,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setActiveChat(null);
     setDraft("");
     setDraftSecret(false);
-    setShowArchivedConversations(false);
+    setConversationListMode("inbox");
     setShowScheduledMessages(false);
     setShowGroupManagement(false);
     setShowGroupCreation(false);
@@ -202,13 +202,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   }, [profile?.id]);
 
   const filteredChats = useMemo(() => chats
-    .filter(chat => (showArchivedConversations ? Boolean(chat.archivedAt) : !chat.archivedAt && !chat.hiddenAt) &&
+    .filter(chat => (conversationListMode === "archived" ? Boolean(chat.archivedAt) : conversationListMode === "hidden" ? Boolean(chat.hiddenAt) && !chat.archivedAt : !chat.archivedAt && !chat.hiddenAt) &&
       chat.name.toLowerCase().includes(search.toLowerCase()))
     .sort((left, right) => {
       const leftPinned = left.pinnedAt ? Date.parse(left.pinnedAt) : 0;
       const rightPinned = right.pinnedAt ? Date.parse(right.pinnedAt) : 0;
       return rightPinned - leftPinned;
-    }), [chats, search, showArchivedConversations]);
+    }), [chats, search, conversationListMode]);
 
   useEffect(() => {
     if (!profile || !supabase) {
@@ -427,7 +427,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     const target = chats.find(chat => chat.conversationId === openConversationId);
     if (!target) return;
     setTab("Chats");
-    setShowArchivedConversations(Boolean(target.archivedAt));
+    setConversationListMode(target.archivedAt ? "archived" : target.hiddenAt ? "hidden" : "inbox");
     setActiveChat(target);
     onNotificationHandled?.();
   }, [openConversationId, chats, onNotificationHandled]);
@@ -480,6 +480,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     const pinned = Boolean(chat.pinnedAt);
     const muted = Boolean(chat.mutedUntil && Date.parse(chat.mutedUntil) > Date.now());
     const archived = Boolean(chat.archivedAt);
+    const hidden = Boolean(chat.hiddenAt);
     Alert.alert(chat.name, "Manage this conversation on your account.", [
       {
         text: pinned ? "Unpin" : "Pin to top",
@@ -493,8 +494,18 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             onPress: () => void updateConversationPreference(chat, { muted_until: muted ? null : new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString() }),
           },
           {
-            text: archived ? "Unarchive" : "Archive",
-            onPress: () => void updateConversationPreference(chat, { archived_at: archived ? null : new Date().toISOString() }),
+            text: "Manage inbox",
+            onPress: () => Alert.alert(chat.name, "Choose where this conversation appears.", [
+              {
+                text: archived ? "Move to inbox" : "Archive",
+                onPress: () => void updateConversationPreference(chat, { archived_at: archived ? null : new Date().toISOString() }),
+              },
+              {
+                text: hidden ? "Unhide conversation" : "Hide from inbox",
+                onPress: () => void updateConversationPreference(chat, { hidden_at: hidden ? null : new Date().toISOString() }),
+              },
+              { text: "Cancel", style: "cancel" },
+            ]),
           },
           { text: "Cancel", style: "cancel" },
         ]),
@@ -817,15 +828,26 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             <TextInput value={search} onChangeText={setSearch} placeholder="Search conversations" placeholderTextColor={c.muted} style={[styles.searchInput, { color: c.text }]} />
           </View>
           <View style={styles.sectionHeading}>
-            <Text style={[styles.sectionTitle, { color: c.text }]}>{showArchivedConversations ? "Archived" : "Messages"}</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setShowArchivedConversations(value => !value)}
-                style={{ paddingVertical: 6, paddingHorizontal: 4 }}
-              >
-                <Text style={{ color: accentColor, fontSize: 11, fontWeight: "800" }}>{showArchivedConversations ? "Inbox" : "Archived"}</Text>
-              </Pressable>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>
+              {conversationListMode === "archived" ? "Archived" : conversationListMode === "hidden" ? "Hidden" : "Messages"}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+              {([
+                ["inbox", "Inbox"], ["archived", "Archived"], ["hidden", "Hidden"],
+              ] as const).map(([mode, label]) => {
+                const selected = conversationListMode === mode;
+                return (
+                  <Pressable
+                    key={mode}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setConversationListMode(mode)}
+                    style={{ paddingVertical: 6, paddingHorizontal: 7, borderRadius: radius.sm, backgroundColor: selected ? (dark ? "#302A55" : "#EEEAFE") : "transparent" }}
+                  >
+                    <Text style={{ color: selected ? accentColor : c.muted, fontSize: 10, fontWeight: "800" }}>{label}</Text>
+                  </Pressable>
+                );
+              })}
               <Text style={[styles.countText, { color: c.muted }]}>{filteredChats.length}</Text>
             </View>
           </View>
