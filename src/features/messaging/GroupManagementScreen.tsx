@@ -9,7 +9,7 @@ import { palette, radius, spacing } from "../../theme/tokens";
 import { supabase } from "../../lib/supabase";
 import {
   addGroupMembers, loadGroupMembers, removeGroupMember, renameGroupConversation,
-  transferGroupOwnership, type GroupMember
+  setGroupMemberRole, transferGroupOwnership, type GroupMember
 } from "./groups";
 import { lookupProfileByUsername } from "./service";
 
@@ -117,6 +117,20 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
     );
   }
 
+  function confirmRoleChange(member: GroupMember) {
+    const nextRole = member.member_role === "admin" ? "member" : "admin";
+    Alert.alert(
+      nextRole === "admin" ? "Make this member an admin?" : "Remove admin rights?",
+      nextRole === "admin"
+        ? `@${member.username ?? member.display_name ?? "This member"} will be able to manage members and group details.`
+        : `@${member.username ?? member.display_name ?? "This member"} will become a regular member.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Confirm", onPress: () => void run(() => setGroupMemberRole(conversationId, member.user_id, nextRole)) },
+      ],
+    );
+  }
+
   function confirmTransfer(member: GroupMember) {
     Alert.alert(
       "Transfer group ownership?",
@@ -180,12 +194,17 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
                     <Text style={styles.memberUsername}>{member.username ? `@${member.username} · ` : ""}{member.member_role}</Text>
                   </View>
                   {currentMember?.member_role === "owner" && !self && member.member_role !== "owner" ? (
-                    <Pressable accessibilityRole="button" onPress={() => confirmTransfer(member)} style={styles.memberAction}>
-                      <Text style={styles.transferText}>Make owner</Text>
-                    </Pressable>
+                    <>
+                      <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRoleChange(member)} style={styles.memberAction}>
+                        <Text style={styles.transferText}>{member.member_role === "admin" ? "Remove admin" : "Make admin"}</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmTransfer(member)} style={styles.memberAction}>
+                        <Text style={styles.transferText}>Make owner</Text>
+                      </Pressable>
+                    </>
                   ) : null}
                   {canRemove ? (
-                    <Pressable accessibilityRole="button" onPress={() => confirmRemove(member)} style={styles.memberAction}>
+                    <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRemove(member)} style={styles.memberAction}>
                       <Text style={styles.removeText}>{self ? "Leave" : "Remove"}</Text>
                     </Pressable>
                   ) : null}

@@ -70,3 +70,18 @@ export async function renameGroupConversation(conversationId: string, title: str
   });
   if (error) throw error;
 }
+
+export async function setGroupMemberRole(
+  conversationId: string,
+  userId: string,
+  role: "admin" | "member",
+): Promise<void> {
+  if (!conversationId || !userId) throw new Error("A group and member are required.");
+  if (role !== "admin" && role !== "member") throw new Error("Unsupported group role.");
+  const { error } = await client().rpc("set_group_member_role", {
+    target_conversation_id: conversationId,
+    target_user_id: userId,
+    new_role: role,
+  });
+  if (error) throw error;
+}

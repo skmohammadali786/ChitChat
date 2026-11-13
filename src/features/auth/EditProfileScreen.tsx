@@ -19,6 +19,7 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
   const [displayName, setDisplayName] = useState(profile.display_name);
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio ?? "");
+  const [discoverable, setDiscoverable] = useState(profile.discoverable);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,6 +68,7 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
           username: cleanUsername,
           display_name: cleanDisplayName,
           bio: cleanBio,
+          discoverable,
         })
         .eq("id", profile.id)
         .select("id, username, display_name, bio, avatar_path, discoverable")
@@ -116,6 +118,20 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
         <Text style={styles.label}>Bio</Text>
         <TextInput value={bio} onChangeText={setBio} placeholder="A short line about yourself" placeholderTextColor={palette.muted} style={[styles.field, styles.bio]} multiline maxLength={160} textAlignVertical="top" />
         <Text style={styles.counter}>{bio.length}/160</Text>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: discoverable }}
+          onPress={() => setDiscoverable(value => !value)}
+          style={styles.discoveryRow}
+        >
+          <View style={[styles.checkbox, discoverable && styles.checkboxSelected]}>
+            {discoverable ? <Text style={styles.checkmark}>✓</Text> : null}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.discoveryTitle}>Username discovery</Text>
+            <Text style={styles.discoveryHint}>Allow other ChitChat users to find you by your exact username. Your email remains private.</Text>
+          </View>
+        </Pressable>
 
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <Pressable accessibilityRole="button" disabled={busy} onPress={save} style={[styles.primary, busy && styles.disabled]}>
@@ -146,6 +162,12 @@ const styles = StyleSheet.create({
   usernameInput: { flex: 1, color: palette.ink, fontSize: 14, paddingVertical: 0 },
   bio: { minHeight: 92, paddingTop: 13 },
   counter: { color: palette.muted, fontSize: 10, textAlign: "right", marginTop: 5 },
+  discoveryRow: { flexDirection: "row", alignItems: "flex-start", gap: 11, marginTop: spacing.xl, padding: spacing.md, backgroundColor: palette.white, borderWidth: 1, borderColor: palette.line, borderRadius: radius.md },
+  checkbox: { width: 21, height: 21, borderRadius: 6, borderWidth: 1.5, borderColor: "#C8CBD5", alignItems: "center", justifyContent: "center", marginTop: 1 },
+  checkboxSelected: { backgroundColor: palette.brand, borderColor: palette.brand },
+  checkmark: { color: "#FFFFFF", fontWeight: "900", fontSize: 14, lineHeight: 17 },
+  discoveryTitle: { color: palette.inkSoft, fontSize: 12, fontWeight: "800" },
+  discoveryHint: { color: palette.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
   primary: { minHeight: 50, borderRadius: radius.md, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center", marginTop: spacing.xl },
   primaryText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
   disabled: { opacity: 0.65 },

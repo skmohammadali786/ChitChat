@@ -62,6 +62,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
@@ -451,17 +452,26 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   }, [profile?.id, profile?.discoverable]);
 
   async function toggleDiscovery() {
-    if (!profile || !supabase) return;
-    const nextValue = !discoveryEnabled;
+    if (!profile || !supabase || discoveryBusy) return;
+    const previousValue = discoveryEnabled;
+    const nextValue = !previousValue;
     setDiscoveryEnabled(nextValue);
+    setDiscoveryBusy(true);
     setDiscoveryError("");
-    const { error } = await supabase
-      .from("profiles")
-      .update({ discoverable: nextValue })
-      .eq("id", profile.id);
-    if (error) {
-      setDiscoveryEnabled(!nextValue);
-      setDiscoveryError(error.message);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ discoverable: nextValue })
+        .eq("id", profile.id)
+        .select("id, username, display_name, bio, avatar_path, discoverable")
+        .single();
+      if (error) throw error;
+      onProfileUpdated?.(data as ChitChatProfile);
+    } catch (caught) {
+      setDiscoveryEnabled(previousValue);
+      setDiscoveryError(caught instanceof Error ? caught.message : "Could not update username discovery.");
+    } finally {
+      setDiscoveryBusy(false);
     }
   }
 
@@ -961,7 +971,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 accessibilityRole="switch"
                 accessibilityState={{ checked: discoveryEnabled }}
                 onPress={toggleDiscovery}
-                style={[styles.toggle, discoveryEnabled && styles.toggleOn]}
+                disabled={discoveryBusy}
+                style={[styles.toggle, discoveryEnabled && styles.toggleOn, discoveryBusy && { opacity: 0.55 }]}
               >
                 <View style={[styles.toggleKnob, discoveryEnabled && styles.toggleKnobOn]} />
               </Pressable>
