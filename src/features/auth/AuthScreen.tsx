@@ -17,12 +17,15 @@ export function AuthScreen({ onContinueDemo }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [canResendConfirmation, setCanResendConfirmation] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function submit() {
     setError("");
     setNotice("");
+    setCanResendConfirmation(false);
 
     const cleanEmail = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
@@ -74,6 +77,7 @@ export function AuthScreen({ onContinueDemo }: Props) {
           setNotice("Account created. Complete your profile to continue.");
         } else {
           setNotice("Check your email to confirm your account. Then return to ChitChat and sign in.");
+          setCanResendConfirmation(true);
           setMode("signin");
         }
       } else {
@@ -84,9 +88,39 @@ export function AuthScreen({ onContinueDemo }: Props) {
         if (authError) throw authError;
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Authentication failed. Try again.");
+      const message = caught instanceof Error ? caught.message : "Authentication failed. Try again.";
+      if (/email not confirmed/i.test(message)) {
+        setCanResendConfirmation(true);
+        setNotice("Your email address is not confirmed yet. Resend the confirmation email below.");
+      }
+      setError(message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^\\S+@\\S+\\.\\S+$/.test(cleanEmail)) {
+      setError("Enter the email address you used to sign up.");
+      return;
+    }
+    if (!supabase || resending) return;
+
+    setResending(true);
+    setError("");
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: cleanEmail,
+        options: { emailRedirectTo: Linking.createURL("auth/callback") },
+      });
+      if (resendError) throw resendError;
+      setNotice("A new confirmation email has been sent. Check your inbox and spam folder.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not resend the confirmation email.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -131,6 +165,16 @@ export function AuthScreen({ onContinueDemo }: Props) {
 
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
+          {canResendConfirmation ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={resending}
+              onPress={() => void resendConfirmation()}
+              style={{ alignSelf: "flex-start", paddingVertical: 10 }}
+            >
+              <Text style={styles.switchAction}>{resending ? "Sending confirmation email…" : "Resend confirmation email"}</Text>
+            </Pressable>
+          ) : null}
 
           <Pressable accessibilityRole="button" disabled={busy} onPress={submit} style={[styles.primary, busy && styles.disabled]}>
             {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{isSignup ? "Create account" : isReset ? "Send reset link" : "Sign in"}</Text>}
