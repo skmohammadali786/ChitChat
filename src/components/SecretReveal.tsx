@@ -26,6 +26,7 @@ export function SecretReveal({ text, autoReveal = false, dark = false, accentCol
   const [revealed, setRevealed] = useState(autoReveal);
   const [reduceMotion, setReduceMotion] = useState(false);
   const progress = useRef(new Animated.Value(autoReveal ? 1 : 0)).current;
+  const previousAutoReveal = useRef(autoReveal);
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +42,8 @@ export function SecretReveal({ text, autoReveal = false, dark = false, accentCol
 
   useEffect(() => {
     if (autoReveal && !revealed) reveal();
+    else if (previousAutoReveal.current && !autoReveal && revealed) hide();
+    previousAutoReveal.current = autoReveal;
   }, [autoReveal, revealed]);
 
   useEffect(() => {
@@ -82,7 +85,7 @@ export function SecretReveal({ text, autoReveal = false, dark = false, accentCol
           onPress={hide}
         >
           <Animated.View style={[styles.revealed, { opacity: progress, transform: [{ scale }] }, { backgroundColor: colors.revealedBackground, borderColor: colors.revealedBorder }]}>
-            <Text selectable style={[styles.secretText, { color: colors.secretText }]}>{text}</Text>
+            <Text style={[styles.secretText, { color: colors.secretText }]}>{text}</Text>
             <Text style={[styles.helper, { color: colors.hiddenHint }]}>Tap to hide again</Text>
           </Animated.View>
         </Pressable>
