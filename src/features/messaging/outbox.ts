@@ -11,6 +11,9 @@ export type PendingEncryptedMessage = {
   envelope: EncryptedMessageEnvelope;
   queuedAt: string;
   attempts: number;
+  nextAttemptAt?: string;
+  failedAt?: string | null;
+  lastError?: string | null;
 };
 
 let queueOperation: Promise<unknown> = Promise.resolve();
@@ -57,15 +60,25 @@ function parseQueue(raw: string | null): PendingEncryptedMessage[] {
   try {
     const decoded: unknown = JSON.parse(raw);
     if (!Array.isArray(decoded)) return [];
-    return decoded.filter((item): item is PendingEncryptedMessage => {
-      if (!item || typeof item !== "object") return false;
+    return decoded.flatMap((item): PendingEncryptedMessage[] => {
+      if (!item || typeof item !== "object") return [];
       const value = item as Partial<PendingEncryptedMessage>;
-      return typeof value.conversationId === "string"
+      const valid = typeof value.conversationId === "string"
         && value.conversationId.length > 0
         && isEnvelope(value.envelope)
         && typeof value.queuedAt === "string"
         && Number.isInteger(value.attempts)
-        && Number(value.attempts) >= 0;
+        && Number(value.attempts) >= 0
+        && (value.nextAttemptAt === undefined || typeof value.nextAttemptAt === "string")
+        && (value.failedAt === undefined || value.failedAt === null || typeof value.failedAt === "string")
+        && (value.lastError === undefined || value.lastError === null || typeof value.lastError === "string");
+      if (!valid) return [];
+      return [{
+        ...(value as PendingEncryptedMessage),
+        nextAttemptAt: value.nextAttemptAt || value.queuedAt,
+        failedAt: value.failedAt ?? null,
+        lastError: value.lastError ?? null,
+      }];
     });
   } catch {
     return [];
@@ -111,6 +124,9 @@ export async function enqueueEncryptedMessage(
       envelope,
       queuedAt: new Date().toISOString(),
       attempts: 0,
+      nextAttemptAt: new Date().toISOString(),
+      failedAt: null,
+      lastError: null,
     });
     await writeForUser(userId, items);
   });
