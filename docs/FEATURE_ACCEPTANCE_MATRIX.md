@@ -11,8 +11,8 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Email signup and login | PARTIAL | Real Supabase account flow, email confirmation, Android/iOS deep links, error states |
-| Password recovery | PARTIAL | Recovery link, deep-link callback, password update and device tests |
+| Email signup and login | PARTIAL | Real Supabase signup/sign-in, confirmation callback, resend confirmation email, and actionable unconfirmed-email state are wired; Android/iOS email delivery and deep-link device tests remain |
+| Password recovery | PARTIAL | Reset link from sign-in and signed-in account Settings, recovery deep-link callback, password update and return-to-sign-in flow are wired; Android/iOS email delivery and device tests remain |
 | Username and profile | PARTIAL | Unique username, display name, bio, onboarding and editing are wired; profile discovery privacy is editable in Settings and Edit Profile; encrypted avatar picker/decrypt/display and device tests remain |
 | Username discovery | PARTIAL | Exact lookup, opt-in discoverability from onboarding, Settings and Edit Profile, rate limits and block filtering; Android/iOS acceptance tests remain |
 | Optional phone discovery | NOT STARTED | Explicit permission, normalized phone matching, privacy controls |
@@ -103,7 +103,7 @@ Legend:
 | Light/dark/system themes | PARTIAL | System/light/dark selection now follows OS appearance and syncs to Supabase; full token coverage across every screen remains |
 | Accent palette selection | PARTIAL | Six palette choices now persist locally and to Supabase and recolor primary controls; full all-screen token coverage remains |
 | Design system | PARTIAL | Astryx-informed conventions, reusable components and state coverage |
-| Reduced motion | PARTIAL | Shared page transitions, button feedback and secret reveal respect the OS setting; verify all future motion surfaces and reduced-motion behavior on physical devices |
+| Reduced motion | PARTIAL | Shared page transitions, animated press feedback and secret reveal respect the OS setting; callback-based pressed styles are preserved; physical Android/iOS reduced-motion tests remain |
 | Accessibility | NOT STARTED | TalkBack, VoiceOver, focus order, labels, contrast and touch targets |
 | Android release build | NOT STARTED | Rust module linked, APK/AAB built and device tested |
 | iOS release build | NOT STARTED | Rust module linked, IPA built and device tested |
