@@ -101,3 +101,5 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - Supabase now revokes authenticated INSERT privileges on `messages` and `scheduled_messages` and drops their direct insert policies until a server-verifiable MLS protocol acceptance path exists.
 - Scheduled-message UPDATE is revoked. Users cancel pending rows through a dedicated ownership-checked RPC.
 - The live database has no authenticated INSERT grants for either table. Existing scheduled rows can still be read and cancelled. The secure composer remains disabled.
+
+- Report throttling now takes a per-reporter transaction-scoped advisory lock and applies across both message and conversation submissions.
