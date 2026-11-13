@@ -1,158 +1,441 @@
-//! OpenMLS protocol integration tests and shared MLS configuration.
+//! Production OpenMLS runtime used by the future Android/iOS native bridge.
 //!
-//! This module uses the real OpenMLS 0.9.2 implementation with the RFC 9420
-//! mandatory X25519/AES-128-GCM/Ed25519 ciphersuite. It currently runs in the
-//! Rust core test/runtime process. It is not yet persisted in protected device
-//! storage or exposed through the Android/iOS React Native bridge, so it does
-//! not enable the production message composer.
+//! All private protocol state is persisted through ProtectedOpenMlsProvider.
+//! The provider refuses to open until the native Keychain/Keystore key has
+//! been injected. This module never stores plaintext messages in Supabase.
+//!
+//! The native bridge and application-level membership authorization are
+//! separate release gates. Callers must set allow_control_messages only
+//! after checking the current server-authorized group roster and role.
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
-use crate::mls_provider::ProtectedOpenMlsProvider;
+use serde::{Deserialize, Serialize};
 
-/// The mutually supported mandatory-to-implement ChitChat MLS ciphersuite.
+use crate::{mls_provider::ProtectedOpenMlsProvider, CoreError, CoreResult};
+
+/// The mutually supported ChitChat MLS ciphersuite.
 pub const CHITCHAT_CIPHERSUITE: Ciphersuite =
     Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 
-/// Create a fresh MLS credential and signer for a single device identity.
-#[cfg(test)]
-fn test_identity(
+const MAX_IDENTITY_BYTES: usize = 512;
+const MAX_KEY_PACKAGE_BYTES: usize = 64 * 1024;
+const MAX_WIRE_MESSAGE_BYTES: usize = 1024 * 1024;
+
+/// A public key package ready to publish to the authenticated device directory.
+///
+/// Its private init/encryption key material remains inside the local OpenMLS
+/// storage provider. Only wire_bytes may be uploaded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MlsKeyPackage {
+    /// TLS-serialized public MLS KeyPackage.
+    pub wire_bytes: Vec<u8>,
+}
+
+/// Commit and Welcome produced when adding one member to an MLS group.
+///
+/// Send commit to existing group members and welcome only to the new device.
+/// Neither value contains application plaintext.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MlsAddMemberResult {
+    /// TLS-serialized MLS Commit for existing members.
+    pub commit: Vec<u8>,
+    /// TLS-serialized MLS Welcome for the added member.
+    pub welcome: Vec<u8>,
+    /// The committed group epoch after the local sender merges its commit.
+    pub epoch: u64,
+}
+
+/// Type of an authenticated inbound MLS event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MlsEventKind {
+    /// An authenticated application message.
+    Application,
+    /// An authenticated Commit was merged after caller authorization.
+    CommitMerged,
+    /// A message authored by this device was echoed by the delivery service.
+    OwnEcho,
+}
+
+/// Result of processing an inbound MLS wire message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MlsProcessedMessage {
+    /// Event kind.
+    pub kind: MlsEventKind,
+    /// Decrypted application bytes. Present only for application messages.
+    pub plaintext: Option<Vec<u8>>,
+    /// Current local group epoch after processing.
+    pub epoch: u64,
+}
+
+/// Persistent OpenMLS operations for a single installed device.
+///
+/// Construct this only after a native platform adapter has retrieved or
+/// created a random 32-byte key in Android Keystore or iOS Keychain and called
+/// install_mls_storage_key. Do not share one provider connection between
+/// runtime instances.
+pub struct MlsRuntime {
+    provider: ProtectedOpenMlsProvider,
+}
+
+impl MlsRuntime {
+    /// Open the protected, app-private SQLite database.
+    ///
+    /// This returns an error while the storage key is locked or unavailable.
+    pub fn open(database_path: &str) -> CoreResult<Self> {
+        let provider = ProtectedOpenMlsProvider::open(database_path)
+            .map_err(|_| CoreError::MlsStorageUnavailable)?;
+        Ok(Self { provider })
+    }
+
+    /// Generate a device-scoped public MLS KeyPackage.
+    ///
+    /// identity must be a stable, non-secret identifier for the account and
+    /// device, encoded by the caller. A new signing key is generated and
+    /// retained only inside the encrypted local OpenMLS storage.
+    pub fn generate_key_package(&self, identity: &[u8]) -> CoreResult<MlsKeyPackage> {
+        let (signer, credential) = create_credential(&self.provider, identity)?;
+        let bundle = KeyPackage::builder()
+            .build(
+                CHITCHAT_CIPHERSUITE,
+                &self.provider,
+                &signer,
+                credential,
+            )
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+
+        let wire_bytes = bundle
+            .key_package()
+            .tls_serialize_detached()
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        if wire_bytes.is_empty() || wire_bytes.len() > MAX_KEY_PACKAGE_BYTES {
+            return Err(CoreError::MlsInvalidKeyPackage);
+        }
+
+        Ok(MlsKeyPackage { wire_bytes })
+    }
+
+    /// Create a new MLS group for a direct or group conversation.
+    ///
+    /// The returned group identifier is base64url without padding. It is an
+    /// MLS identifier, not the Supabase conversation UUID.
+    pub fn create_group(&self, identity: &[u8]) -> CoreResult<String> {
+        let (signer, credential) = create_credential(&self.provider, identity)?;
+        let group = MlsGroup::builder()
+            .ciphersuite(CHITCHAT_CIPHERSUITE)
+            .use_ratchet_tree_extension(true)
+            .build(&self.provider, &signer, credential)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+
+        Ok(URL_SAFE_NO_PAD.encode(group.group_id().as_slice()))
+    }
+
+    /// Add a device using its public MLS KeyPackage.
+    ///
+    /// The caller must first verify the target device bundle and confirm that
+    /// the current server-side group role permits this membership change.
+    /// The resulting commit is merged locally before this method returns.
+    pub fn add_member(
+        &self,
+        group_id: &str,
+        key_package_bytes: &[u8],
+    ) -> CoreResult<MlsAddMemberResult> {
+        if key_package_bytes.is_empty() || key_package_bytes.len() > MAX_KEY_PACKAGE_BYTES {
+            return Err(CoreError::MlsInvalidKeyPackage);
+        }
+
+        let mut group = load_group(&self.provider, group_id)?;
+        let signer = group_signer(&self.provider, &group)?;
+        let key_package_in = KeyPackageIn::tls_deserialize_exact(key_package_bytes)
+            .map_err(|_| CoreError::MlsInvalidKeyPackage)?;
+        let key_package = key_package_in
+            .validate(self.provider.crypto(), ProtocolVersion::Mls10)
+            .map_err(|_| CoreError::MlsInvalidKeyPackage)?;
+
+        let (commit, welcome, _group_info) = group
+            .add_members(&self.provider, &signer, core::slice::from_ref(&key_package))
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        group
+            .merge_pending_commit(&self.provider)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+
+        Ok(MlsAddMemberResult {
+            commit: commit.to_bytes().map_err(|_| CoreError::MlsOperationFailed)?,
+            welcome: welcome.to_bytes().map_err(|_| CoreError::MlsOperationFailed)?,
+            epoch: group.epoch().as_u64(),
+        })
+    }
+
+    /// Join a group from a Welcome addressed to this device's stored KeyPackage.
+    pub fn join_group(&self, welcome_bytes: &[u8]) -> CoreResult<String> {
+        if welcome_bytes.is_empty() || welcome_bytes.len() > MAX_WIRE_MESSAGE_BYTES {
+            return Err(CoreError::MlsInvalidWireMessage);
+        }
+
+        let message = MlsMessageIn::tls_deserialize_exact(welcome_bytes)
+            .map_err(|_| CoreError::MlsInvalidWelcome)?;
+        let MlsMessageBodyIn::Welcome(welcome) = message.extract() else {
+            return Err(CoreError::MlsInvalidWelcome);
+        };
+
+        let group = StagedWelcome::new_from_welcome(
+            &self.provider,
+            &MlsGroupJoinConfig::default(),
+            welcome,
+            None,
+        )
+        .map_err(|_| CoreError::MlsInvalidWelcome)?
+        .into_group(&self.provider)
+        .map_err(|_| CoreError::MlsInvalidWelcome)?;
+
+        Ok(URL_SAFE_NO_PAD.encode(group.group_id().as_slice()))
+    }
+
+    /// Encrypt application bytes with the current group epoch.
+    ///
+    /// The caller should pass a versioned ChitChat message-content envelope,
+    /// not an unstructured plaintext string. This method returns only MLS
+    /// wire bytes. It does not write to Supabase or Cloudflare.
+    pub fn encrypt_application(
+        &self,
+        group_id: &str,
+        plaintext: &[u8],
+    ) -> CoreResult<Vec<u8>> {
+        if plaintext.is_empty() || plaintext.len() > MAX_WIRE_MESSAGE_BYTES {
+            return Err(CoreError::MlsInvalidPlaintext);
+        }
+
+        let mut group = load_group(&self.provider, group_id)?;
+        let signer = group_signer(&self.provider, &group)?;
+        let encrypted = group
+            .create_message(&self.provider, &signer, plaintext)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        encrypted
+            .to_bytes()
+            .map_err(|_| CoreError::MlsOperationFailed)
+    }
+
+    /// Authenticate and process one inbound MLS wire message.
+    ///
+    /// Application messages are decrypted and returned. Commits are merged
+    /// only when allow_control_messages is true. The caller must set that
+    /// flag only after checking the sender's role and the expected membership
+    /// change against the authenticated server roster. Standalone proposals
+    /// are rejected until an explicit proposal-approval workflow is added.
+    pub fn process_incoming(
+        &self,
+        group_id: &str,
+        wire_bytes: &[u8],
+        allow_control_messages: bool,
+    ) -> CoreResult<MlsProcessedMessage> {
+        if wire_bytes.is_empty() || wire_bytes.len() > MAX_WIRE_MESSAGE_BYTES {
+            return Err(CoreError::MlsInvalidWireMessage);
+        }
+
+        let mut group = load_group(&self.provider, group_id)?;
+        let incoming = MlsMessageIn::tls_deserialize_exact(wire_bytes)
+            .map_err(|_| CoreError::MlsInvalidWireMessage)?;
+        let protocol_message = incoming
+            .try_into_protocol_message()
+            .map_err(|_| CoreError::MlsInvalidWireMessage)?;
+        let processed = group
+            .process_message(&self.provider, protocol_message)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+
+        let (kind, plaintext) = match processed.into_content() {
+            ProcessedMessageContent::ApplicationMessage(application) => {
+                (MlsEventKind::Application, Some(application.into_bytes()))
+            }
+            ProcessedMessageContent::StagedCommitMessage(staged_commit) => {
+                if !allow_control_messages {
+                    return Err(CoreError::MlsControlMessageRequiresApproval);
+                }
+                group
+                    .merge_staged_commit(&self.provider, *staged_commit)
+                    .map_err(|_| CoreError::MlsOperationFailed)?;
+                (MlsEventKind::CommitMerged, None)
+            }
+            ProcessedMessageContent::OwnPendingCommit => {
+                if !allow_control_messages {
+                    return Err(CoreError::MlsControlMessageRequiresApproval);
+                }
+                group
+                    .merge_pending_commit(&self.provider)
+                    .map_err(|_| CoreError::MlsOperationFailed)?;
+                (MlsEventKind::CommitMerged, None)
+            }
+            ProcessedMessageContent::OwnPrivateMessage => (MlsEventKind::OwnEcho, None),
+            ProcessedMessageContent::ProposalMessage(_)
+            | ProcessedMessageContent::ExternalJoinProposalMessage(_) => {
+                return Err(CoreError::MlsControlMessageRequiresApproval);
+            }
+        };
+
+        Ok(MlsProcessedMessage {
+            kind,
+            plaintext,
+            epoch: group.epoch().as_u64(),
+        })
+    }
+
+    /// Stage and locally merge a self-update, returning its MLS Commit bytes.
+    ///
+    /// The returned commit must be distributed to the other group members.
+    pub fn rotate_own_leaf(&self, group_id: &str) -> CoreResult<Vec<u8>> {
+        let mut group = load_group(&self.provider, group_id)?;
+        let signer = group_signer(&self.provider, &group)?;
+        let update = group
+            .self_update(&self.provider, &signer, LeafNodeParameters::default())
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        let (commit, _welcome, _group_info) = update.into_contents();
+        let wire_bytes = commit
+            .to_bytes()
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        group
+            .merge_pending_commit(&self.provider)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        Ok(wire_bytes)
+    }
+
+    /// Return the current local epoch for a group.
+    pub fn current_epoch(&self, group_id: &str) -> CoreResult<u64> {
+        let group = load_group(&self.provider, group_id)?;
+        Ok(group.epoch().as_u64())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_provider(provider: ProtectedOpenMlsProvider) -> Self {
+        Self { provider }
+    }
+}
+
+fn validate_identity(identity: &[u8]) -> CoreResult<()> {
+    if identity.is_empty() || identity.len() > MAX_IDENTITY_BYTES {
+        return Err(CoreError::MlsInvalidIdentity);
+    }
+    Ok(())
+}
+
+fn create_credential(
     provider: &ProtectedOpenMlsProvider,
     identity: &[u8],
-) -> (SignatureKeyPair, CredentialWithKey) {
-    let credential = BasicCredential::new(identity.to_vec());
+) -> CoreResult<(SignatureKeyPair, CredentialWithKey)> {
+    validate_identity(identity)?;
     let signer = SignatureKeyPair::new(CHITCHAT_CIPHERSUITE.signature_algorithm())
-        .expect("generate Ed25519 signature keys");
-    signer.store(provider.storage()).expect("store signature keys");
-
+        .map_err(|_| CoreError::MlsOperationFailed)?;
+    signer
+        .store(provider.storage())
+        .map_err(|_| CoreError::MlsStorageUnavailable)?;
+    let credential = BasicCredential::new(identity.to_vec());
     let credential_with_key = CredentialWithKey {
         credential: credential.into(),
         signature_key: signer.public().into(),
     };
-    (signer, credential_with_key)
+    Ok((signer, credential_with_key))
+}
+
+fn decode_group_id(value: &str) -> CoreResult<GroupId> {
+    if value.is_empty() || value.len() > 512 {
+        return Err(CoreError::MlsInvalidGroupId);
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| CoreError::MlsInvalidGroupId)?;
+    if bytes.is_empty() || bytes.len() > 255 {
+        return Err(CoreError::MlsInvalidGroupId);
+    }
+    Ok(GroupId::from_slice(&bytes))
+}
+
+fn load_group(provider: &ProtectedOpenMlsProvider, value: &str) -> CoreResult<MlsGroup> {
+    let group_id = decode_group_id(value)?;
+    MlsGroup::load(provider.storage(), &group_id)
+        .map_err(|_| CoreError::MlsStorageUnavailable)?
+        .ok_or(CoreError::MlsGroupNotFound)
+}
+
+fn group_signer(
+    provider: &ProtectedOpenMlsProvider,
+    group: &MlsGroup,
+) -> CoreResult<SignatureKeyPair> {
+    let public_key = group
+        .own_leaf_node()
+        .ok_or(CoreError::MlsOperationFailed)?
+        .signature_key();
+    SignatureKeyPair::read(
+        provider.storage(),
+        public_key.as_slice(),
+        group.ciphersuite().signature_algorithm(),
+    )
+    .ok_or(CoreError::MlsStorageUnavailable)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mls_storage::{clear_mls_storage_key, install_mls_storage_key, MLS_TEST_LOCK};
 
     #[test]
-    fn two_clients_exchange_mls_application_messages_and_rotate_epoch() {
-        let _storage_test_guard = crate::mls_storage::MLS_TEST_LOCK
-            .lock()
-            .expect("acquire serialized MLS storage test lock");
-        crate::mls_storage::clear_mls_storage_key().expect("clear previous MLS storage key");
-        crate::mls_storage::install_mls_storage_key(&[0x6b; 32])
-            .expect("install ephemeral test storage key");
+    fn runtime_creates_joins_encrypts_decrypts_and_rotates_epoch() {
+        let _storage_test_guard = MLS_TEST_LOCK.lock().expect("acquire serialized MLS storage test lock");
+        clear_mls_storage_key().expect("clear previous MLS storage key");
+        install_mls_storage_key(&[0x6b; 32]).expect("install ephemeral test storage key");
 
-        let alice_provider = ProtectedOpenMlsProvider::in_memory()
-            .expect("open Alice encrypted SQLite provider");
-        let bob_provider = ProtectedOpenMlsProvider::in_memory()
-            .expect("open Bob encrypted SQLite provider");
-        let (alice_signer, alice_credential) = test_identity(&alice_provider, b"alice-device-1");
-        let (bob_signer, bob_credential) = test_identity(&bob_provider, b"bob-device-1");
+        let alice_provider = ProtectedOpenMlsProvider::in_memory().expect("open Alice provider");
+        let bob_provider = ProtectedOpenMlsProvider::in_memory().expect("open Bob provider");
+        let alice = MlsRuntime::from_provider(alice_provider);
+        let bob = MlsRuntime::from_provider(bob_provider);
 
-        let bob_key_package = KeyPackage::builder()
-            .build(
-                CHITCHAT_CIPHERSUITE,
-                &bob_provider,
-                &bob_signer,
-                bob_credential,
-            )
-            .expect("build Bob key package");
+        let bob_key_package = bob.generate_key_package(b"bob-device-1").expect("generate Bob KeyPackage");
+        let group_id = alice.create_group(b"alice-device-1").expect("create Alice group");
+        assert_eq!(alice.current_epoch(&group_id).unwrap(), 0);
 
-        let mut alice_group = MlsGroup::builder()
-            .ciphersuite(CHITCHAT_CIPHERSUITE)
-            .use_ratchet_tree_extension(true)
-            .build(&alice_provider, &alice_signer, alice_credential)
-            .expect("create Alice MLS group");
+        let invite = alice.add_member(&group_id, &bob_key_package.wire_bytes).expect("add Bob");
+        assert!(!invite.commit.is_empty());
+        assert!(!invite.welcome.is_empty());
+        assert!(invite.epoch > 0);
 
-        let (_commit, welcome, _group_info) = alice_group
-            .add_members(
-                &alice_provider,
-                &alice_signer,
-                core::slice::from_ref(bob_key_package.key_package()),
-            )
-            .expect("add Bob by KeyPackage");
-        alice_group
-            .merge_pending_commit(&alice_provider)
-            .expect("merge group membership commit");
+        let joined_group_id = bob.join_group(&invite.welcome).expect("join from Welcome");
+        assert_eq!(joined_group_id, group_id);
+        assert_eq!(bob.current_epoch(&joined_group_id).unwrap(), invite.epoch);
 
-        let mut bob_group = StagedWelcome::new_from_welcome(
-            &bob_provider,
-            &MlsGroupJoinConfig::default(),
-            welcome,
-            None,
-        )
-        .expect("process MLS Welcome")
-        .into_group(&bob_provider)
-        .expect("join MLS group");
+        let message = "Hello from ChitChat 🔐".as_bytes();
+        let encrypted = alice.encrypt_application(&group_id, message).expect("encrypt application");
+        assert_ne!(encrypted, message);
+        let received = bob.process_incoming(&group_id, &encrypted, false).expect("decrypt application");
+        assert_eq!(received.kind, MlsEventKind::Application);
+        assert_eq!(received.plaintext.as_deref(), Some(message.as_slice()));
 
-        assert_eq!(alice_group.epoch(), bob_group.epoch());
-        assert_eq!(alice_group.members().count(), 2);
-        assert_eq!(bob_group.members().count(), 2);
+        let prior_epoch = bob.current_epoch(&group_id).unwrap();
+        let commit = bob.rotate_own_leaf(&group_id).expect("rotate Bob leaf");
+        assert!(!commit.is_empty());
+        let applied = alice.process_incoming(&group_id, &commit, true).expect("apply authorized key update");
+        assert_eq!(applied.kind, MlsEventKind::CommitMerged);
+        assert!(applied.epoch > prior_epoch);
+        assert_eq!(applied.epoch, bob.current_epoch(&group_id).unwrap());
 
-        let secret = "Hello from ChitChat 🔐".as_bytes();
-        let encrypted = alice_group
-            .create_message(&alice_provider, &alice_signer, secret)
-            .expect("encrypt an MLS application message");
-        let processed = bob_group
-            .process_message(
-                &bob_provider,
-                encrypted.into_protocol_message().expect("convert MLS message"),
-            )
-            .expect("authenticate and decrypt MLS message");
-        let ProcessedMessageContent::ApplicationMessage(application) = processed.into_content() else {
-            panic!("expected an MLS application message");
-        };
-        assert_eq!(application.into_bytes(), secret);
+        let next_message = b"New epoch key material is active.";
+        let encrypted = bob.encrypt_application(&group_id, next_message).expect("encrypt after rotation");
+        let received = alice.process_incoming(&group_id, &encrypted, false).expect("decrypt after rotation");
+        assert_eq!(received.plaintext.as_deref(), Some(next_message.as_slice()));
 
-        let prior_epoch = bob_group.epoch();
-        let (commit, _welcome, _group_info) = bob_group
-            .self_update(
-                &bob_provider,
-                &bob_signer,
-                LeafNodeParameters::default(),
-            )
-            .expect("stage Bob's MLS self-update")
-            .into_contents();
+        clear_mls_storage_key().expect("clear test storage key");
+    }
 
-        let processed_commit = alice_group
-            .process_message(
-                &alice_provider,
-                commit.into_protocol_message().expect("convert MLS commit"),
-            )
-            .expect("process Bob's MLS key update");
-        let ProcessedMessageContent::StagedCommitMessage(staged_commit) =
-            processed_commit.into_content()
-        else {
-            panic!("expected a staged MLS commit");
-        };
+    #[test]
+    fn runtime_rejects_empty_identity_and_malformed_wire_data() {
+        let _storage_test_guard = MLS_TEST_LOCK.lock().expect("acquire serialized MLS storage test lock");
+        clear_mls_storage_key().expect("clear previous MLS storage key");
+        install_mls_storage_key(&[0x31; 32]).expect("install ephemeral test storage key");
+        let provider = ProtectedOpenMlsProvider::in_memory().expect("open test provider");
+        let runtime = MlsRuntime::from_provider(provider);
 
-        alice_group
-            .merge_staged_commit(&alice_provider, *staged_commit)
-            .expect("merge Bob's key update");
-        bob_group
-            .merge_pending_commit(&bob_provider)
-            .expect("merge own key update");
+        assert_eq!(runtime.create_group(&[]), Err(CoreError::MlsInvalidIdentity));
+        assert_eq!(runtime.join_group(b"not a Welcome"), Err(CoreError::MlsInvalidWelcome));
+        assert_eq!(runtime.current_epoch("not-base64"), Err(CoreError::MlsInvalidGroupId));
 
-        assert!(alice_group.epoch() > prior_epoch);
-        assert_eq!(alice_group.epoch(), bob_group.epoch());
-
-        let after_rotation = b"New epoch key material is active.";
-        let encrypted = bob_group
-            .create_message(&bob_provider, &bob_signer, after_rotation)
-            .expect("encrypt after MLS key rotation");
-        let processed = alice_group
-            .process_message(
-                &alice_provider,
-                encrypted.into_protocol_message().expect("convert new epoch message"),
-            )
-            .expect("decrypt message from new MLS epoch");
-        let ProcessedMessageContent::ApplicationMessage(application) = processed.into_content() else {
-            panic!("expected an MLS application message after rotation");
-        };
-        assert_eq!(application.into_bytes(), after_rotation);
-        crate::mls_storage::clear_mls_storage_key().expect("clear MLS test key");
+        clear_mls_storage_key().expect("clear test storage key");
     }
 }
