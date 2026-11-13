@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View,
+  AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, Text, View,
 } from "react-native";
 import { palette, radius, spacing } from "../theme/tokens";
 
@@ -42,6 +42,13 @@ export function SecretReveal({ text, autoReveal = false, dark = false, accentCol
   useEffect(() => {
     if (autoReveal && !revealed) reveal();
   }, [autoReveal, revealed]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", state => {
+      if (state !== "active" && revealed) hide();
+    });
+    return () => subscription.remove();
+  }, [revealed, reduceMotion]);
 
   function reveal() {
     setRevealed(true);
