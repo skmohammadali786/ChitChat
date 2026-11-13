@@ -89,9 +89,11 @@ pub enum MessageBlock {
         media_kind: MediaKind,
         /// Random 32-byte media key encoded as unpadded base64url.
         ///
-        /// This value is plaintext only inside MessageContent. MLS encryption
-        /// protects it while the content travels through Supabase.
+        /// This field exists only inside the MLS-encrypted MessageContent.
+        /// Never copy it into Supabase metadata or Cloudflare headers.
         file_key: String,
+        /// XChaCha20-Poly1305 24-byte nonce, encoded as unpadded base64url.
+        nonce: String,
         /// Version of the Rust media encryption format.
         crypto_version: u32,
         /// Lowercase SHA-256 digest of the encrypted media bytes.
@@ -146,6 +148,7 @@ pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
             }
             MessageBlock::Media {
                 file_key,
+                nonce,
                 crypto_version,
                 sha256,
                 size_bytes,
@@ -166,11 +169,14 @@ pub fn validate_message_content(content: &MessageContent) -> CoreResult<()> {
                         };
                         value % 4 == 0
                     }).unwrap_or(false);
+                let valid_nonce = nonce.len() == 32
+                    && nonce.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
                 let valid_digest = sha256.len() == 64
                     && sha256
                         .bytes()
                         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
                 if !valid_key
+                    || !valid_nonce
                     || *crypto_version == 0
                     || !valid_digest
                     || *size_bytes == 0

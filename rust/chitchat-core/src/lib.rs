@@ -11,6 +11,8 @@ mod device_identity;
 mod mls_storage;
 mod mls_provider;
 mod mls_engine;
+mod bridge;
+uniffi::setup_scaffolding!();
 mod profile;
 mod result;
 
@@ -21,6 +23,7 @@ pub use mls_storage::{
     ChitChatStorageCodec, StorageCodecError, clear_mls_storage_key,
     install_mls_storage_key, mls_storage_is_unlocked,
 };
+pub use bridge::{ChitChatBridgeError, ChitChatMlsBridge};
 pub use mls_engine::{
     MlsAddMemberResult, MlsEventKind, MlsKeyPackage, MlsProcessedMessage,
     MlsRemoveMemberResult, MlsRuntime,
