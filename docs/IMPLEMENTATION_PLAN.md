@@ -37,7 +37,7 @@
 ## Phase 4: full messaging
 - End-to-end encrypted message persistence and realtime delivery.
 - Offline outbox, delivery/read state, and message history.
-- Media, voice notes, files, groups, reactions, replies, search, scheduled messages, and disappearing messages.
+- Media, voice notes, files, MLS group messaging, reactions UI, replies, search, scheduled message creation and disappearing messages.
 - Push notifications with privacy-preserving payloads.
 - Abuse prevention, block/report, and operational monitoring.
 
