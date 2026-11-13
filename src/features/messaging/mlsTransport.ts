@@ -295,8 +295,8 @@ export async function sendMlsMediaMessage(
     picked.uri,
     group.groupId,
     picked.kind as MediaKind,
-    options.concealed ?? false,
     clientMessageId,
+    options.concealed ?? false,
   );
   if (!encrypted.object_id || encrypted.media_kind !== picked.kind || !encrypted.content_message_base64) {
     throw new Error("The native media encryptor returned incomplete MLS metadata.");
