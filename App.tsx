@@ -17,6 +17,7 @@ import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScree
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
+import { reportConversation } from "./src/features/messaging/reporting";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
@@ -416,6 +417,56 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     ]);
   }
 
+  async function submitConversationReport(chat: Chat, reason: "spam" | "harassment") {
+    if (!chat.isReal || !chat.conversationId) return;
+    try {
+      await reportConversation({
+        conversationId: chat.conversationId,
+        targetUserId: chat.isGroup ? null : chat.remoteUserId ?? null,
+        reason,
+      });
+      Alert.alert("Report submitted", "Your report was sent privately for review.");
+    } catch (error) {
+      Alert.alert("Could not submit report", error instanceof Error ? error.message : "Please try again later.");
+    }
+  }
+
+  function showReportReasons(chat: Chat) {
+    Alert.alert(
+      chat.isGroup ? "Report this group" : "Report this account",
+      "Select the closest reason. Reports are private.",
+      [
+        { text: "Spam or unwanted messages", onPress: () => void submitConversationReport(chat, "spam") },
+        { text: "Harassment or unsafe content", onPress: () => void submitConversationReport(chat, "harassment") },
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
+  }
+
+  function showBlockConfirmation(chat: Chat) {
+    if (!chat.remoteUserId) return;
+    Alert.alert(
+      "Block this account?",
+      `You will not find or receive new direct messages from @${chat.name}. You can unblock them later in Settings.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => {
+            const targetUserId = chat.remoteUserId!;
+            void blockUser(targetUserId).then(() => {
+              setChats(old => old.filter(item => item.remoteUserId !== targetUserId));
+              setActiveChat(null);
+            }).catch(error => {
+              Alert.alert("Could not block account", error instanceof Error ? error.message : "Please try again.");
+            });
+          },
+        },
+      ],
+    );
+  }
+
   function sendMessage() {
     const value = draft.trim();
     if (!value) return;
@@ -575,30 +626,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           subtitle={typingUserId ? "typing…" : activeChat.isGroup ? "group conversation" : activeChat.online ? "online now" : showLastSeen ? "offline" : "status hidden"}
           back={() => setActiveChat(null)}
           action={activeChat.isGroup ? {
-            label: "Members",
-            onPress: () => setShowGroupManagement(true),
+            label: "Options",
+            onPress: () => Alert.alert(activeChat.name, "Group conversation controls.", [
+              { text: "Manage members", onPress: () => setShowGroupManagement(true) },
+              { text: "Report group", onPress: () => showReportReasons(activeChat) },
+              { text: "Cancel", style: "cancel" },
+            ]),
           } : activeChat.isReal && activeChat.remoteUserId ? {
-            label: "Block",
-            onPress: () => Alert.alert(
-              "Block this account?",
-              `You will not find or receive new direct messages from @${activeChat.name}. You can unblock them later in Settings.`,
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Block",
-                  style: "destructive",
-                  onPress: () => {
-                    const targetUserId = activeChat.remoteUserId!;
-                    void blockUser(targetUserId).then(() => {
-                      setChats(old => old.filter(chat => chat.remoteUserId !== targetUserId));
-                      setActiveChat(null);
-                    }).catch(error => {
-                      Alert.alert("Could not block account", error instanceof Error ? error.message : "Please try again.");
-                    });
-                  }
-                }
-              ]
-            )
+            label: "More",
+            onPress: () => Alert.alert(activeChat.name, "Account controls.", [
+              { text: "Report account", onPress: () => showReportReasons(activeChat) },
+              { text: "Block account", style: "destructive", onPress: () => showBlockConfirmation(activeChat) },
+              { text: "Cancel", style: "cancel" },
+            ]),
           } : undefined}
         />
         <View style={[styles.encryptionNote, { backgroundColor: activeChat.isReal ? (dark ? "#282342" : "#EEEAFE") : (dark ? "#202B35" : "#EAF6EF") }]}>
