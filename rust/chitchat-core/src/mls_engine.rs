@@ -411,6 +411,10 @@ mod tests {
         let prior_epoch = bob.current_epoch(&group_id).unwrap();
         let commit = bob.rotate_own_leaf(&group_id).expect("rotate Bob leaf");
         assert!(!commit.is_empty());
+        assert_eq!(
+            alice.process_incoming(&group_id, &commit, false),
+            Err(CoreError::MlsControlMessageRequiresApproval)
+        );
         let applied = alice.process_incoming(&group_id, &commit, true).expect("apply authorized key update");
         assert_eq!(applied.kind, MlsEventKind::CommitMerged);
         assert!(applied.epoch > prior_epoch);
@@ -420,6 +424,14 @@ mod tests {
         let encrypted = bob.encrypt_application(&group_id, next_message).expect("encrypt after rotation");
         let received = alice.process_incoming(&group_id, &encrypted, false).expect("decrypt after rotation");
         assert_eq!(received.plaintext.as_deref(), Some(next_message.as_slice()));
+
+        let removed = alice.remove_member(&group_id, 1).expect("remove Bob from group");
+        assert!(removed.epoch > applied.epoch);
+        let removal_event = bob
+            .process_incoming(&group_id, &removed.commit, true)
+            .expect("process Bob's removal commit");
+        assert_eq!(removal_event.kind, MlsEventKind::CommitMerged);
+        assert!(bob.encrypt_application(&group_id, b"must not send after removal").is_err());
 
         clear_mls_storage_key().expect("clear test storage key");
     }

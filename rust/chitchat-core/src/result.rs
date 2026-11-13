@@ -102,5 +102,11 @@ pub enum CoreError {
     /// A proposal or commit requires explicit server-side policy approval.
     #[error("The MLS control message requires server-side authorization.")]
     MlsControlMessageRequiresApproval,
+    /// The requested MLS member leaf index is not present in the group.
+    #[error("The MLS member was not found in this group.")]
+    MlsMemberNotFound,
+    /// A local device cannot remove itself through the member-removal API.
+    #[error("Use the explicit leave-group operation to remove this device.")]
+    MlsCannotRemoveSelf,
 
 }

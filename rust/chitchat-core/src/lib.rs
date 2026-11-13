@@ -22,7 +22,8 @@ pub use mls_storage::{
     install_mls_storage_key, mls_storage_is_unlocked,
 };
 pub use mls_engine::{
-    MlsAddMemberResult, MlsEventKind, MlsKeyPackage, MlsProcessedMessage, MlsRuntime,
+    MlsAddMemberResult, MlsEventKind, MlsKeyPackage, MlsProcessedMessage,
+    MlsRemoveMemberResult, MlsRuntime,
     CHITCHAT_CIPHERSUITE,
 };
 pub use message::{
