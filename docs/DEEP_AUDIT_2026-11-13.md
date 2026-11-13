@@ -145,3 +145,6 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 - Added direct-account and group report actions. A private server RPC validates conversation membership, target membership, supported reasons and a five-per-hour per-account limit. Reports remain in the private moderation schema; no reviewer/admin console or abuse triage workflow exists yet.
 - Added explicit crypto-gate checks to message insertion, scheduled-message creation, encrypted media upload and encrypted avatar upload. This prevents lower-level callers from bypassing the disabled composer while the native MLS implementation is unavailable.
 - Supabase security and health advisors returned no lints after the reporting changes. The target-user foreign-key index warning was fixed with migration `20261113031015_index_message_reports_target_user`. Unused-index notices are expected on an empty project and are not a reason to drop required indexes.
+
+
+- Added device-authentication app lock using Expo LocalAuthentication. The app requires an enrolled device credential before enabling the setting, locks when the app leaves the foreground, and gates the signed-in UI until successful authentication. Android/iOS device and lifecycle tests are still pending.
