@@ -81,10 +81,9 @@ export async function loadScheduledMessages(): Promise<ScheduledMessage[]> {
 }
 
 export async function cancelScheduledMessage(id: string): Promise<void> {
-  const { error } = await client()
-    .from("scheduled_messages")
-    .update({ status: "cancelled" })
-    .eq("id", id)
-    .eq("status", "pending");
+  if (!id) throw new Error("Choose a scheduled message to cancel.");
+  const { error } = await client().rpc("cancel_scheduled_message", {
+    target_scheduled_message_id: id,
+  });
   if (error) throw error;
 }
