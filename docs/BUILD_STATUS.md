@@ -79,3 +79,11 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - Direct-account and group report actions call a private membership-checked RPC with reason validation and a five-per-hour rate limit. A reviewer console and moderation workflow are not implemented.
 - The message, scheduled-message and media service methods now independently enforce the fail-closed crypto gate, not just the UI.
 - Reporting migrations are recorded as `20261113030813_add_conversation_reporting` and `20261113031015_index_message_reports_target_user`. Security and health advisors returned no lints after these changes.
+
+
+## App lock implementation
+
+- Added `expo-local-authentication` for Expo SDK 58 and configured the iOS Face ID usage description.
+- Signed-in users can enable app lock after authenticating with a configured device credential.
+- When enabled, the app locks whenever it leaves the foreground and requires device authentication before reopening conversations. The native OS flow can use biometrics or device PIN/passcode fallback.
+- This source integration has not yet been exercised in Android/iOS development builds. App-switching, cancellation, lockout, enrollment changes and notification-opening behavior must be tested on physical devices.
