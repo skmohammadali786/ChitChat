@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { supabase } from "../../lib/supabase";
 import { palette, radius, spacing, typeScale } from "../../theme/tokens";
 

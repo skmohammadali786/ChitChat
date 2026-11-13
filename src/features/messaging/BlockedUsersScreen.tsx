@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View
+  ActivityIndicator, ScrollView, StyleSheet, Text, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { loadBlockedUsers, unblockUser, type BlockedProfile } from "./service";
