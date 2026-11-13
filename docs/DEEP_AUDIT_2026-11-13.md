@@ -136,3 +136,12 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 ## Merge and APK gate
 
 Do not merge PR #1 or call an APK complete until all release-critical checks pass. An APK can be built earlier for a clearly labelled UI/native smoke test, but it must not be presented as a working secure messaging release. Termux can initiate an EAS Android cloud build; it cannot locally build iOS without macOS/Xcode.
+
+
+## Additional implementation after this audit
+
+- Added a scheduled-message management screen. It lists pending encrypted envelopes and supports cancellation. New scheduling remains fail-closed until a real MLS composer exists.
+- Added system/light/dark theme selection using the OS color scheme and six selectable accent palettes. Theme and palette preferences persist locally and sync to Supabase for signed-in users. Some screen styles still need to consume the semantic accent token.
+- Added direct-account and group report actions. A private server RPC validates conversation membership, target membership, supported reasons and a five-per-hour per-account limit. Reports remain in the private moderation schema; no reviewer/admin console or abuse triage workflow exists yet.
+- Added explicit crypto-gate checks to message insertion, scheduled-message creation, encrypted media upload and encrypted avatar upload. This prevents lower-level callers from bypassing the disabled composer while the native MLS implementation is unavailable.
+- Supabase security and health advisors returned no lints after the reporting changes. The target-user foreign-key index warning was fixed with migration `20261113031015_index_message_reports_target_user`. Unused-index notices are expected on an empty project and are not a reason to drop required indexes.
