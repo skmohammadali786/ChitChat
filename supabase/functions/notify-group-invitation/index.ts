@@ -118,11 +118,7 @@ Deno.serve(
           body: JSON.stringify(payload),
         });
         if (!expoResponse.ok) {
-          await admin.from("group_invitations")
-            .update({ notification_claimed_at: null })
-            .eq("id", invitation.id)
-            .is("notification_sent_at", null);
-          return json({ error: "Push delivery service rejected the invitation notification." }, 502);
+          return json({ error: "Push delivery service rejected the invitation notification. Retry after the delivery lease expires." }, 502);
         }
 
         const result = await expoResponse.json().catch(() => null) as {
