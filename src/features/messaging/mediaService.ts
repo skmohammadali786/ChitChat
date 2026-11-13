@@ -31,7 +31,7 @@ export type StoredMedia = {
   storage: "cloudflare-r2";
 };
 
-function decodeBase64(value: string): ArrayBuffer {
+export function decodeBase64ToArrayBuffer(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
   if (!normalized || !/^[A-Za-z0-9+/]+$/.test(normalized) || normalized.length % 4 === 1) {
     throw new Error("The native Rust module returned invalid base64 ciphertext.");
