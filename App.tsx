@@ -20,6 +20,7 @@ import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScreen";
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { GroupInvitationsScreen } from "./src/features/messaging/GroupInvitationsScreen";
+import { CallsScreen } from "./src/features/messaging/CallsScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
 import { DeviceManagementScreen } from "./src/features/security/DeviceManagementScreen";
@@ -1081,11 +1082,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           />
         </>
       ) : tab === "Calls" ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>◌</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Your calls, in one place</Text>
-          <Text style={[styles.emptyCopy, { color: c.muted }]}>Voice and video calling are planned for a later release.</Text>
-        </View>
+        <CallsScreen
+          userId={profile?.id ?? null}
+          conversations={chats
+            .filter(chat => chat.isReal && !chat.isGroup && chat.conversationId && chat.remoteUserId)
+            .map(chat => ({
+              conversationId: chat.conversationId!,
+              peerUserId: chat.remoteUserId!,
+              label: chat.name,
+            }))}
+        />
       ) : (
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
           {profile ? (
