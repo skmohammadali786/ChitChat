@@ -28,7 +28,13 @@
           "configureAndroidBackup": true
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow ChitChat to use Face ID to unlock your private messages."
+        }
+      ]
     ]
   }
 }
