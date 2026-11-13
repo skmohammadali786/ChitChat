@@ -24,11 +24,12 @@ Legend:
 |---|---|---|
 | Conversation list and history | PARTIAL | Signed-in list loads real Supabase conversation records with account isolation and loading/empty/error states; message history rendering, pagination and decryption are not implemented |
 | Real-time message delivery | PARTIAL | Conversation realtime foundations exist, but authenticated client inserts are disabled until MLS protocol validation is implemented; history subscription/reconnect behavior remains unverified |
-| End-to-end encryption | NOT STARTED | Reviewed Olm/Double Ratchet or other selected protocol, key exchange, ratchet persistence and independent review |
-| Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
+| Voice and video calls | NOT STARTED | Native WebRTC engine, microphone/camera permissions, authenticated call signaling, STUN/TURN configuration, incoming-call lifecycle, call controls and Android/iOS device tests |
+| End-to-end encryption | NOT STARTED | OpenMLS 0.9.2 is the selected MLS protocol, but its Rust engine, durable protected group storage, device credentials/key packages, key rotation, native Android/iOS bridge, cross-platform vectors and independent review are not implemented |
+| Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion and server role enforcement are wired; invitations and E2EE key rotation remain |
+| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion and server role enforcement are wired; invitations and OpenMLS group key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | PARTIAL | Revealed secret text is non-selectable in the UI; sender-defined copy policy and platform-level capture limitations remain |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
