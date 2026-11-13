@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   memberName: { color: palette.ink, fontSize: 12, fontWeight: "800" },
   memberUsername: { color: palette.muted, fontSize: 10, marginTop: 3 },
   memberActions: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: 8, paddingLeft: 52, marginTop: 6 },
-  memberAction: { minHeight: 32, paddingHorizontal: 8, paddingVertical: 7, justifyContent: "center", borderRadius: radius.sm, backgroundColor: "#F4F1FF" },
+  memberAction: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8, justifyContent: "center", borderRadius: radius.sm, backgroundColor: "#F4F1FF" },
   removeText: { color: "#B42318", fontSize: 10, fontWeight: "800" },
   transferText: { color: palette.brand, fontSize: 10, fontWeight: "800" },
   error: { color: "#B42318", fontSize: 12, lineHeight: 18, marginTop: 14 },
