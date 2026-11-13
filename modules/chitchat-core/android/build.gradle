@@ -14,7 +14,7 @@ android {
 dependencies {
   implementation project(':expo-modules-core')
 }
-def rustRoot = rootProject.projectDir.parentFile.parentFile
+def rustRoot = rootProject.projectDir.parentFile
 tasks.register("buildChitChatRustAndroid", Exec) {
   workingDir rustRoot
   commandLine "bash", "scripts/build-rust-android.sh"

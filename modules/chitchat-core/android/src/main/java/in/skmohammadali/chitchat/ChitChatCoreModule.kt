@@ -27,12 +27,16 @@ class ChitChatCoreModule : Module() {
       }
       val storageKey = ProtectedMlsKeyStore(context).loadOrCreate()
       try {
-        bridge = ChitChatMlsBridge.open(
-          File(databaseDirectory, "openmls.sqlite").absolutePath,
-          storageKey.map { it.toUByte() },
-        )
-      } finally {
-        storageKey.fill(0)
+        val rustStorageKey = storageKey.map { it.toUByte() }.toMutableList()
+        try {
+          bridge = ChitChatMlsBridge(
+            File(databaseDirectory, "openmls.sqlite").absolutePath,
+            rustStorageKey,
+          )
+        } finally {
+          rustStorageKey.fill(0u)
+          storageKey.fill(0)
+        }
       }
       bridge?.isReady() == true
     }

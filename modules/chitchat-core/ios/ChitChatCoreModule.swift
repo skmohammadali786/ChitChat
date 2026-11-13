@@ -26,9 +26,15 @@ public final class ChitChatCoreModule: Module {
       )
       let databaseURL = databaseDirectory.appendingPathComponent("openmls.sqlite")
       let storageKey = try ProtectedMlsKeyStore().loadOrCreate()
-      self.bridge = try ChitChatMlsBridge.open(
+      var rustStorageKey = Array(storageKey)
+      defer { rustStorageKey.withUnsafeMutableBufferPointer { buffer in
+        if let baseAddress = buffer.baseAddress {
+          baseAddress.initialize(repeating: 0, count: buffer.count)
+        }
+      } }
+      self.bridge = try ChitChatMlsBridge(
         databasePath: databaseURL.path,
-        storageKey: Array(storageKey)
+        storageKey: rustStorageKey
       )
       return self.bridge?.isReady() == true
     }
