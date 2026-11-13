@@ -6,7 +6,7 @@ import {
 import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { EncryptedAvatar } from "../../components/EncryptedAvatar";
 import { pickAvatarImage } from "../messaging/mediaPicker";
-import { encryptAndUploadAvatar } from "../messaging/mediaService";
+import { deleteEncryptedMedia, encryptAndUploadAvatar } from "../messaging/mediaService";
 import type { ChitChatProfile } from "../../lib/supabase";
 import { supabase } from "../../lib/supabase";
 import { chitchatCore } from "../../native/chitchatCore";
@@ -29,22 +29,38 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
 
   async function changeAvatar() {
     setError("");
+    if (!chitchatCore.avatarCryptoAvailable) {
+      setError("Encrypted avatars need the protected Rust and Keychain/Keystore module. This build will not upload an unencrypted photo.");
+      return;
+    }
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      return;
+    }
+
     setAvatarBusy(true);
     try {
       const selected = await pickAvatarImage();
       if (!selected) return;
-      if (!chitchatCore.avatarCryptoAvailable) {
-        throw new Error("The Rust avatar encryption and protected Keychain/Keystore bridge are not linked in this build. The photo was not uploaded.");
-      }
+
+      const previousAvatarId = profile.avatar_path;
       await encryptAndUploadAvatar(selected.uri);
-      if (!supabase) throw new Error("Supabase is not configured.");
+
+      // The Worker updates profiles.avatar_path after the R2 object and
+      // metadata row are committed. Read the authoritative profile back.
       const { data, error: profileError } = await supabase
         .from("profiles")
         .select("id,username,display_name,bio,avatar_path,discoverable")
         .eq("id", profile.id)
         .single();
       if (profileError) throw profileError;
+
       onSaved(data as ChitChatProfile);
+      if (previousAvatarId && previousAvatarId !== data.avatar_path) {
+        void deleteEncryptedMedia(previousAvatarId).catch(deleteError => {
+          console.warn("ChitChat could not remove the previous private avatar.", deleteError);
+        });
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update the encrypted avatar.");
     } finally {
