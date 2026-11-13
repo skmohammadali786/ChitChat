@@ -20,8 +20,8 @@
 - Verify email confirmation and password recovery deep links on Android and iOS.
 - Verify username discovery opt-out, exact lookup, rate limiting, and RLS behavior.
 - Verify direct conversation creation is idempotent and only members can list/read it.
-- Add profile editing and avatar uploads through the private Cloudflare R2 media API, with Supabase authorization metadata.
-- Add device registration and account recovery design.
+- Profile editing is present. Complete avatar support through Rust encryption, private Cloudflare R2 upload/download and authenticated metadata updates.
+- Add device identity registration, MLS credential lifecycle and account recovery design. The current public-key registry is only a foundation.
 
 ## Phase 3: secure messaging
 - Implement the OpenMLS 0.9.2 wrapper crate and versioned UniFFI interface.
@@ -39,7 +39,7 @@
 - Offline outbox, delivery/read state, and message history.
 - Media, voice notes, files, MLS group messaging, reactions UI, replies, search, scheduled message creation and disappearing messages.
 - Push notifications with privacy-preserving payloads.
-- Abuse prevention, block/report, and operational monitoring.
+- Complete abuse prevention, block/report moderation console, invite/media throttles and operational monitoring. Basic account/group reporting and server enforcement exist.
 
 ## Phase 5: external sharing and monetization
 - Expiring, revocable encrypted secret links with strict authorization.
