@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import {
-  ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView,
+  ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView, useColorScheme,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
 import { Avatar } from "./src/components/Avatar";
 import { SecretReveal } from "./src/components/SecretReveal";
-import { palette, radius, spacing, typeScale } from "./src/theme/tokens";
+import { accentPalettes, palette, radius, spacing, typeScale } from "./src/theme/tokens";
 import type { Session } from "@supabase/supabase-js";
 import { AuthScreen } from "./src/features/auth/AuthScreen";
 import { PasswordRecoveryScreen } from "./src/features/auth/PasswordRecoveryScreen";
@@ -20,7 +20,7 @@ import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
-import { loadPreferences, savePreference } from "./src/lib/preferences";
+import { loadPreferences, savePreference, type AccentPalette } from "./src/lib/preferences";
 import { loadConversationSettings, loadUserSettings, saveConversationSettings, saveUserSettings, type ConversationSettings } from "./src/features/settings/userSettings";
 import { disablePushNotifications, enablePushNotifications, listenForPushTokenChanges, revokeCurrentPushRegistration, syncPushRegistrationIfGranted } from "./src/features/notifications/registration";
 
@@ -59,7 +59,11 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
   const [messages, setMessages] = useState<Message[]>(seedMessages);
-  const [dark, setDark] = useState(false);
+  const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
+  const [accentPalette, setAccentPalette] = useState<AccentPalette>("violet");
+  const systemColorScheme = useColorScheme();
+  const dark = themeMode === "dark" || (themeMode === "system" && systemColorScheme === "dark");
+  const accentColor = accentPalettes[accentPalette];
   const [autoReveal, setAutoReveal] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [showReadReceipts, setShowReadReceipts] = useState(true);
@@ -86,7 +90,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     void loadPreferences()
       .then(saved => {
         if (!active) return;
-        setDark(saved.dark);
+        setThemeMode(saved.theme);
+        setAccentPalette(saved.accentPalette);
         setAutoReveal(saved.autoReveal);
       })
       .catch(error => console.warn("Could not load ChitChat preferences.", error))
@@ -96,17 +101,31 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     return () => { active = false; };
   }, []);
 
-  function toggleDarkAppearance() {
-    const next = !dark;
-    setDark(next);
-    void savePreference("appearance.dark", next).catch(error => {
-      console.warn("Could not save appearance preference.", error);
-    });
-    if (profile) {
-      void saveUserSettings({ theme: next ? "dark" : "light" }).catch(error => {
-        setDark(!next);
-        setSettingsError(error instanceof Error ? error.message : "Could not save appearance setting.");
-      });
+  async function updateThemeMode(next: "system" | "light" | "dark") {
+    const previous = themeMode;
+    setThemeMode(next);
+    setSettingsError("");
+    try {
+      await savePreference("appearance.theme", next);
+      if (profile) await saveUserSettings({ theme: next });
+    } catch (error) {
+      setThemeMode(previous);
+      void savePreference("appearance.theme", previous);
+      setSettingsError(error instanceof Error ? error.message : "Could not save appearance setting.");
+    }
+  }
+
+  async function updateAccentPalette(next: AccentPalette) {
+    const previous = accentPalette;
+    setAccentPalette(next);
+    setSettingsError("");
+    try {
+      await savePreference("appearance.accentPalette", next);
+      if (profile) await saveUserSettings({ accent_palette: next });
+    } catch (error) {
+      setAccentPalette(previous);
+      void savePreference("appearance.accentPalette", previous);
+      setSettingsError(error instanceof Error ? error.message : "Could not save accent palette.");
     }
   }
 
@@ -169,7 +188,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     let active = true;
     void loadUserSettings().then(saved => {
       if (!active) return;
-      setDark(saved.theme === "dark");
+      setThemeMode(saved.theme);
+      setAccentPalette((saved.accent_palette in accentPalettes ? saved.accent_palette : "violet") as AccentPalette);
+      void savePreference("appearance.theme", saved.theme);
+      void savePreference("appearance.accentPalette", (saved.accent_palette in accentPalettes ? saved.accent_palette : "violet") as AccentPalette);
       setAutoReveal(saved.auto_reveal_secrets);
       setShowReadReceipts(saved.show_read_receipts);
       setShowOnlineStatus(saved.show_online_status);
@@ -411,10 +433,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       </View>
       {action ? (
         <Pressable accessibilityRole="button" onPress={action.onPress} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-          <Text style={{ color: action.label === "Block" ? "#B42318" : palette.brand, fontSize: 12, fontWeight: "800" }}>{action.label}</Text>
+          <Text style={{ color: action.label === "Block" ? "#B42318" : accentColor, fontSize: 12, fontWeight: "800" }}>{action.label}</Text>
         </Pressable>
       ) : !back && newAction ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={styles.newButton} onPress={newAction}>
+        <Pressable accessibilityRole="button" accessibilityLabel="New conversation" style={[styles.newButton, { backgroundColor: accentColor }]} onPress={newAction}>
           <Text style={styles.newButtonText}>＋</Text>
         </Pressable>
       ) : null}
@@ -632,7 +654,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 onPress={() => setShowArchivedConversations(value => !value)}
                 style={{ paddingVertical: 6, paddingHorizontal: 4 }}
               >
-                <Text style={{ color: palette.brand, fontSize: 11, fontWeight: "800" }}>{showArchivedConversations ? "Inbox" : "Archived"}</Text>
+                <Text style={{ color: accentColor, fontSize: 11, fontWeight: "800" }}>{showArchivedConversations ? "Inbox" : "Archived"}</Text>
               </Pressable>
               <Text style={[styles.countText, { color: c.muted }]}>{filteredChats.length}</Text>
             </View>
@@ -658,7 +680,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 <View style={styles.chatDetails}>
                   <View style={styles.chatTop}>
                     <Text style={[styles.chatName, { color: c.text }]}>{item.name}</Text>
-                    <Text style={[styles.chatTime, { color: item.unread ? palette.brand : c.muted }]}>{item.time}</Text>
+                    <Text style={[styles.chatTime, { color: item.unread ? accentColor : c.muted }]}>{item.time}</Text>
                   </View>
                   <View style={styles.chatBottom}>
                     <Text numberOfLines={1} style={[styles.preview, { color: c.muted }]}>{item.secret ? "✦  A concealed message" : item.message}</Text>
@@ -671,7 +693,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
               <View style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 48 }}>
                 <Text style={{ color: c.text, fontSize: 15, fontWeight: "800" }}>{search ? "No matching conversations" : showArchivedConversations ? "No archived conversations" : "Your inbox is empty"}</Text>
                 <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 }}>{showArchivedConversations ? "Conversations you archive will appear here. You can restore them at any time." : "Start with a username. ChitChat only returns profiles that allow discovery."}</Text>
-                <Pressable accessibilityRole="button" onPress={() => setShowNewChat(true)} style={{ backgroundColor: palette.brand, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.md, marginTop: 16 }}>
+                <Pressable accessibilityRole="button" onPress={() => setShowNewChat(true)} style={{ backgroundColor: accentColor, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.md, marginTop: 16 }}>
                   <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 12 }}>Find someone</Text>
                 </Pressable>
                 {conversationLoadError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, textAlign: "center", marginTop: 12 }}>{conversationLoadError}</Text> : null}
@@ -711,12 +733,12 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={[styles.settingTitle, { color: c.text }]}>{profile.display_name}</Text>
                   <Text style={[styles.settingHint, { color: c.muted }]}>@{profile.username}</Text>
-                  <Text style={{ color: palette.brand, fontSize: 10, fontWeight: "800", marginTop: 5 }}>Edit profile</Text>
+                  <Text style={{ color: accentColor, fontSize: 10, fontWeight: "800", marginTop: 5 }}>Edit profile</Text>
                 </View>
               </Pressable>
               {onSignOut ? (
                 <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 8 }}>
-                  <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign out</Text>
+                  <Text style={{ color: accentColor, fontSize: 12, fontWeight: "800" }}>Sign out</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -726,7 +748,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
               <Text style={{ color: dark ? "#B8E8CE" : "#327653", fontSize: 12, lineHeight: 18, marginTop: 5 }}>These conversations use local sample data. Sign in to discover people and create conversations. Message delivery is still in development.</Text>
               {onExitDemo ? (
                 <Pressable accessibilityRole="button" onPress={onExitDemo} style={{ alignSelf: "flex-start", paddingTop: 12 }}>
-                  <Text style={{ color: palette.brand, fontSize: 12, fontWeight: "800" }}>Sign in to your account</Text>
+                  <Text style={{ color: accentColor, fontSize: 12, fontWeight: "800" }}>Sign in to your account</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -750,9 +772,43 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             </Pressable>
           ) : null}
           <Text style={[styles.sectionTitle, { color: c.text, marginBottom: spacing.lg }]}>Your experience</Text>
-          <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
-            <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Dark appearance</Text><Text style={[styles.settingHint, { color: c.muted }]}>Use a darker color palette</Text></View>
-            <Pressable accessibilityRole="switch" accessibilityState={{ checked: dark, disabled: !preferencesReady }} disabled={!preferencesReady} onPress={toggleDarkAppearance} style={[styles.toggle, dark && styles.toggleOn, !preferencesReady && { opacity: 0.55 }]}><View style={[styles.toggleKnob, dark && styles.toggleKnobOn]} /></Pressable>
+          <View style={[styles.settingCard, { backgroundColor: c.surface, flexDirection: "column", alignItems: "stretch" }]}>
+            <Text style={[styles.settingTitle, { color: c.text }]}>Appearance</Text>
+            <Text style={[styles.settingHint, { color: c.muted, marginBottom: spacing.md }]}>Choose system, light, or dark mode.</Text>
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              {([{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }] as const).map(option => {
+                const selected = themeMode === option.value;
+                return (
+                  <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ checked: selected }}
+                    disabled={!preferencesReady} onPress={() => void updateThemeMode(option.value)}
+                    style={{ flex: 1, minHeight: 42, borderRadius: radius.md, borderWidth: 1, borderColor: selected ? accentColor : c.line, backgroundColor: selected ? (dark ? "#302A55" : "#EEEAFE") : c.raised, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ color: selected ? accentColor : c.text, fontSize: 12, fontWeight: "800" }}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <View style={[styles.settingCard, { backgroundColor: c.surface, flexDirection: "column", alignItems: "stretch" }]}>
+            <Text style={[styles.settingTitle, { color: c.text }]}>Accent color</Text>
+            <Text style={[styles.settingHint, { color: c.muted, marginBottom: spacing.md }]}>Pick the color used for key actions and highlights.</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
+              {([
+                ["violet", "Violet"], ["ocean", "Ocean"], ["emerald", "Emerald"],
+                ["rose", "Rose"], ["amber", "Amber"], ["graphite", "Graphite"],
+              ] as const).map(([value, label]) => {
+                const selected = accentPalette === value;
+                return (
+                  <Pressable key={value} accessibilityRole="radio" accessibilityLabel={label}
+                    accessibilityState={{ checked: selected }} onPress={() => void updateAccentPalette(value)}
+                    style={{ width: 82, minHeight: 58, borderRadius: radius.md, borderWidth: selected ? 2 : 1,
+                      borderColor: selected ? accentPalettes[value] : c.line, backgroundColor: c.raised,
+                      alignItems: "center", justifyContent: "center", gap: 5 }}>
+                    <View style={{ width: 19, height: 19, borderRadius: 10, backgroundColor: accentPalettes[value] }} />
+                    <Text style={{ color: c.text, fontSize: 10, fontWeight: "700" }}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
           <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
             <View style={styles.settingCopy}><Text style={[styles.settingTitle, { color: c.text }]}>Auto-reveal secrets</Text><Text style={[styles.settingHint, { color: c.muted }]}>Reveal received secret messages automatically</Text></View>
@@ -766,7 +822,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                   <Text style={[styles.settingTitle, { color: c.text }]}>Message notifications</Text>
                   <Text style={[styles.settingHint, { color: c.muted }]}>{pushEnabled ? "This device is registered for private message alerts." : "Receive a generic alert when a new message arrives."}</Text>
                 </View>
-                <Pressable accessibilityRole="button" disabled={pushBusy} onPress={() => void togglePushNotifications()} style={[styles.smallAction, pushBusy && { opacity: 0.55 }]}>
+                <Pressable accessibilityRole="button" disabled={pushBusy} onPress={() => void togglePushNotifications()} style={[styles.smallAction, { backgroundColor: accentColor }, pushBusy && { opacity: 0.55 }]}>
                   <Text style={styles.smallActionText}>{pushBusy ? "..." : pushEnabled ? "Turn off" : "Enable"}</Text>
                 </Pressable>
               </View>
@@ -784,9 +840,9 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                         accessibilityRole="radio"
                         accessibilityState={{ checked: selected }}
                         onPress={() => void updateNotificationPreview(option.value)}
-                        style={{ flex: 1, minHeight: 42, borderRadius: radius.md, borderWidth: 1, borderColor: selected ? palette.brand : c.line, backgroundColor: selected ? (dark ? "#302A55" : "#EEEAFE") : c.raised, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}
+                        style={{ flex: 1, minHeight: 42, borderRadius: radius.md, borderWidth: 1, borderColor: selected ? accentColor : c.line, backgroundColor: selected ? (dark ? "#302A55" : "#EEEAFE") : c.raised, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}
                       >
-                        <Text style={{ color: selected ? palette.brand : c.text, fontSize: 12, fontWeight: "800" }}>{option.label}</Text>
+                        <Text style={{ color: selected ? accentColor : c.text, fontSize: 12, fontWeight: "800" }}>{option.label}</Text>
                       </Pressable>
                     );
                   })}
@@ -820,7 +876,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           ) : null}
           {settingsError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, marginBottom: spacing.md }}>{settingsError}</Text> : null}
           <View style={[styles.infoCard, { backgroundColor: dark ? "#282342" : "#EEEAFE" }]}>
-            <Text style={{ color: palette.brand, fontWeight: "800", fontSize: 15 }}>Your privacy, your rules.</Text>
+            <Text style={{ color: accentColor, fontWeight: "800", fontSize: 15 }}>Your privacy, your rules.</Text>
             <Text style={{ color: dark ? "#D8D0FF" : "#6559A6", lineHeight: 20, marginTop: 7, fontSize: 13 }}>Choose how secret messages appear. You can reveal them when you're ready, then hide them again.</Text>
           </View>
           <Text style={[styles.version, { color: c.muted }]}>ChitChat · Early preview · v0.2.0</Text>
@@ -829,8 +885,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       <View style={[styles.tabBar, { backgroundColor: c.surface, borderTopColor: c.line }]}>
         {(["Chats", "Calls", "Settings"] as const).map(item => (
           <Pressable key={item} onPress={() => setTab(item)} style={styles.tabItem}>
-            <Text style={{ color: tab === item ? palette.brand : c.muted, fontSize: 19 }}>{item === "Chats" ? "▤" : item === "Calls" ? "◔" : "⚙"}</Text>
-            <Text style={{ color: tab === item ? palette.brand : c.muted, fontSize: 11, fontWeight: tab === item ? "700" : "500", marginTop: 4 }}>{item}</Text>
+            <Text style={{ color: tab === item ? accentColor : c.muted, fontSize: 19 }}>{item === "Chats" ? "▤" : item === "Calls" ? "◔" : "⚙"}</Text>
+            <Text style={{ color: tab === item ? accentColor : c.muted, fontSize: 11, fontWeight: tab === item ? "700" : "500", marginTop: 4 }}>{item}</Text>
           </Pressable>
         ))}
       </View>
@@ -845,7 +901,7 @@ const styles = StyleSheet.create({
   brand: { fontSize: typeScale.heading, fontWeight: "800", letterSpacing: -0.8 },
   subtitle: { fontSize: 12, marginTop: 1 },
   backButton: { width: 34, height: 42, justifyContent: "center" },
-  newButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" },
+  newButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" },
   newButtonText: { color: "#FFFFFF", fontSize: 26, lineHeight: 29 },
   searchBox: { height: 48, marginHorizontal: spacing.lg, borderRadius: radius.md, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, gap: 9 },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
@@ -859,23 +915,23 @@ const styles = StyleSheet.create({
   chatTime: { fontSize: 11 },
   chatBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 5, gap: 8 },
   preview: { fontSize: 13, flex: 1 },
-  unread: { minWidth: 19, height: 19, paddingHorizontal: 5, borderRadius: radius.pill, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" },
+  unread: { minWidth: 19, height: 19, paddingHorizontal: 5, borderRadius: radius.pill, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" },
   unreadText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
   separator: { height: 1, marginLeft: 65 },
   tabBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 76, borderTopWidth: 1, flexDirection: "row", justifyContent: "space-around", paddingTop: 11, paddingBottom: 18 },
   tabItem: { alignItems: "center", flex: 1 },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 42, paddingBottom: 70 },
-  emptyIcon: { fontSize: 58, color: palette.brand, marginBottom: 14 },
+  emptyIcon: { fontSize: 58, color: accentColor, marginBottom: 14 },
   emptyTitle: { fontSize: 19, fontWeight: "800", textAlign: "center" },
   emptyCopy: { textAlign: "center", fontSize: 13, lineHeight: 20, marginTop: 8 },
   settingCard: { borderRadius: radius.lg, padding: spacing.lg, flexDirection: "row", alignItems: "center", marginBottom: spacing.md },
-  smallAction: { minWidth: 76, minHeight: 36, paddingHorizontal: 10, borderRadius: radius.md, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" },
+  smallAction: { minWidth: 76, minHeight: 36, paddingHorizontal: 10, borderRadius: radius.md, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" },
   smallActionText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   settingCopy: { flex: 1, paddingRight: 12 },
   settingTitle: { fontSize: 14, fontWeight: "700" },
   settingHint: { fontSize: 12, marginTop: 4, lineHeight: 17 },
   toggle: { width: 46, height: 27, borderRadius: radius.pill, backgroundColor: "#D5D9E0", padding: 3, justifyContent: "center" },
-  toggleOn: { backgroundColor: palette.brand },
+  toggleOn: { backgroundColor: accentColor },
   toggleKnob: { width: 21, height: 21, borderRadius: radius.pill, backgroundColor: "#FFFFFF" },
   toggleKnobOn: { alignSelf: "flex-end" },
   infoCard: { borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md },
@@ -887,7 +943,7 @@ const styles = StyleSheet.create({
   myRow: { justifyContent: "flex-end" },
   theirRow: { justifyContent: "flex-start" },
   bubble: { maxWidth: "84%", paddingHorizontal: 13, paddingVertical: 10, borderRadius: 18 },
-  myBubble: { backgroundColor: palette.brand, borderBottomRightRadius: 5 },
+  myBubble: { backgroundColor: accentColor, borderBottomRightRadius: 5 },
   theirBubble: { borderBottomLeftRadius: 5 },
   messageText: { fontSize: 14, lineHeight: 21 },
   messageTime: { fontSize: 10, textAlign: "right", marginTop: 5 },
@@ -896,9 +952,9 @@ const styles = StyleSheet.create({
   secretToggle: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: "#F0F1F5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "transparent" },
   secretToggleOn: { backgroundColor: "#EEEAFE", borderColor: "#DAD2FF" },
   secretToggleText: { color: "#89919E", fontSize: 19, fontWeight: "800" },
-  secretToggleTextOn: { color: palette.brand },
+  secretToggleTextOn: { color: accentColor },
   input: { flex: 1, height: 44, borderRadius: radius.pill, paddingHorizontal: 16, fontSize: 14 },
-  sendButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" }
+  sendButton: { width: 42, height: 42, borderRadius: radius.pill, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" }
 });
 
 
