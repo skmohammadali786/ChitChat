@@ -23,6 +23,7 @@ import { GroupInvitationsScreen } from "./src/features/messaging/GroupInvitation
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
 import { DeviceManagementScreen } from "./src/features/security/DeviceManagementScreen";
+import { DeviceVerificationScreen } from "./src/features/security/DeviceVerificationScreen";
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
@@ -65,6 +66,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
   const [showDeviceManagement, setShowDeviceManagement] = useState(false);
+  const [deviceVerificationChat, setDeviceVerificationChat] = useState<Chat | null>(null);
   const [reportingChat, setReportingChat] = useState<Chat | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
@@ -210,6 +212,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setConversationListMode("inbox");
     setShowScheduledMessages(false);
     setShowDeviceManagement(false);
+    setDeviceVerificationChat(null);
     setReportingChat(null);
     setShowGroupManagement(false);
     setShowGroupInvitations(false);
@@ -791,6 +794,20 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     );
   }
 
+  if (deviceVerificationChat?.conversationId && deviceVerificationChat.remoteUserId) {
+    return (
+      <AnimatedSafeAreaView key="device-verification" style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <DeviceVerificationScreen
+          conversationId={deviceVerificationChat.conversationId}
+          peerUserId={deviceVerificationChat.remoteUserId}
+          peerLabel={deviceVerificationChat.name}
+          onBack={() => setDeviceVerificationChat(null)}
+        />
+      </AnimatedSafeAreaView>
+    );
+  }
+
   if (showProfileEditor && profile) {
     return (
       <AnimatedSafeAreaView key="profile-editor" style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -907,6 +924,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           } : activeChat.isReal && activeChat.remoteUserId ? {
             label: "More",
             onPress: () => Alert.alert(activeChat.name, "Account controls.", [
+              { text: "Verify security code", onPress: () => setDeviceVerificationChat(activeChat) },
               { text: "Report account", onPress: () => showReportReasons(activeChat) },
               { text: "Block account", style: "destructive", onPress: () => showBlockConfirmation(activeChat) },
               { text: "Cancel", style: "cancel" },

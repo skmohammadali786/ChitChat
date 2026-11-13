@@ -81,3 +81,94 @@ export async function revokeMyDevice(deviceId: string): Promise<void> {
   if (error) throw error;
   if (!data) throw new Error("Device not found or already revoked.");
 }
+
+export type PeerDevice = {
+  device_id: string;
+  user_id: string;
+  device_label: string;
+  platform: "android" | "ios";
+  identity_key_public: string;
+  signed_prekey_public: string;
+  signed_prekey_signature: string;
+  fingerprint: string | null;
+  key_version: number;
+  created_at: string;
+  last_seen_at: string;
+  trusted: boolean;
+  trusted_at: string | null;
+};
+
+export async function listPeerDevices(
+  conversationId: string,
+  peerUserId: string,
+): Promise<PeerDevice[]> {
+  if (!conversationId || !peerUserId) throw new Error("A conversation and peer account are required.");
+  const { data, error } = await client().rpc("list_peer_devices", {
+    target_conversation_id: conversationId,
+    target_user_id: peerUserId,
+  });
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as PeerDevice[];
+}
+
+export async function trustPeerDevice(deviceId: string, fingerprint: string): Promise<string> {
+  if (!deviceId || !/^\d{10}$/.test(fingerprint)) {
+    throw new Error("A verified device and ten-digit fingerprint are required.");
+  }
+  const { data, error } = await client().rpc("trust_peer_device", {
+    target_device_id: deviceId,
+    expected_fingerprint: fingerprint,
+  });
+  if (error) throw error;
+  if (typeof data !== "string") throw new Error("Supabase returned an invalid device trust timestamp.");
+  return data;
+}
+
+export async function untrustPeerDevice(deviceId: string): Promise<void> {
+  if (!deviceId) throw new Error("Choose a device to remove from trusted devices.");
+  const { error } = await client().rpc("untrust_peer_device", {
+    target_device_id: deviceId,
+  });
+  if (error) throw error;
+}
+
+export type PeerDevice = {
+  device_id: string;
+  user_id: string;
+  device_label: string;
+  platform: "android" | "ios";
+  identity_key_public: string;
+  signed_prekey_public: string;
+  signed_prekey_signature: string;
+  fingerprint: string | null;
+  key_version: number;
+  created_at: string;
+  last_seen_at: string;
+  trusted: boolean;
+  trusted_at: string | null;
+};
+
+export async function listPeerDevices(conversationId: string, peerUserId: string): Promise<PeerDevice[]> {
+  if (!conversationId || !peerUserId) throw new Error("A conversation and peer account are required.");
+  const { data, error } = await client().rpc("list_peer_devices", {
+    target_conversation_id: conversationId,
+    target_user_id: peerUserId,
+  });
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as PeerDevice[];
+}
+
+export async function trustPeerDevice(deviceId: string, fingerprint: string): Promise<void> {
+  if (!deviceId || !/^\d{10}$/.test(fingerprint)) throw new Error("A verified device and ten-digit fingerprint are required.");
+  const { error } = await client().rpc("trust_peer_device", {
+    target_device_id: deviceId,
+    expected_fingerprint: fingerprint,
+  });
+  if (error) throw error;
+}
+
+export async function untrustPeerDevice(deviceId: string): Promise<void> {
+  if (!deviceId) throw new Error("Choose a device to remove from trusted devices.");
+  const { error } = await client().rpc("untrust_peer_device", { target_device_id: deviceId });
+  if (error) throw error;
+}
