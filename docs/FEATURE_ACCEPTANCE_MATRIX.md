@@ -29,7 +29,7 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion and server role enforcement are wired; invitations and OpenMLS group key rotation remain |
+| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion, expiring invitation inbox, accept/decline/revoke flows and server role enforcement are wired; OpenMLS group key rotation remains |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | PARTIAL | Revealed secret text is non-selectable in the UI; sender-defined copy policy and platform-level capture limitations remain |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
@@ -67,7 +67,7 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Offline outbox | PARTIAL | Bounded per-account ciphertext-only queue, idempotent FIFO retry helper and app-foreground retry hook exist; real composer integration, network-state reconnect wiring and device tests remain |
+| Offline outbox | PARTIAL | Bounded per-account ciphertext-only queue, idempotent FIFO retry helper, app-foreground retry and Expo network-reconnection retry hooks exist; real composer integration and device tests remain |
 | Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
 | Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
 | Push notifications | PARTIAL | Expo token registration, authenticated generic sender-only delivery, mute/opt-out enforcement and notification tap routing exist; EAS credentials and real-device delivery/retry tests remain |

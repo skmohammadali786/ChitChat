@@ -9,6 +9,27 @@ export type GroupMember = {
   joined_at: string;
 };
 
+export type GroupInvitation = {
+  invitation_id: string;
+  invitee_id: string;
+  invitee_username: string | null;
+  invitee_display_name: string | null;
+  status: "pending";
+  created_at: string;
+  expires_at: string;
+};
+
+export type MyGroupInvitation = {
+  invitation_id: string;
+  conversation_id: string;
+  conversation_title: string | null;
+  inviter_id: string;
+  inviter_username: string | null;
+  inviter_display_name: string | null;
+  created_at: string;
+  expires_at: string;
+};
+
 function client() {
   if (!supabase) throw new Error("Supabase is not configured.");
   return supabase;
@@ -43,6 +64,55 @@ export async function addGroupMembers(conversationId: string, memberIds: string[
   });
   if (error) throw error;
   return Number(data || 0);
+}
+
+export async function sendGroupInvitation(conversationId: string, userId: string): Promise<string> {
+  if (!conversationId || !userId) throw new Error("A group and discoverable account are required.");
+  const { data, error } = await client().rpc("create_group_invitation", {
+    target_conversation_id: conversationId,
+    target_user_id: userId,
+  });
+  if (error) throw error;
+  if (typeof data !== "string") throw new Error("Supabase returned an invalid invitation ID.");
+  return data;
+}
+
+export async function loadGroupInvitations(conversationId: string): Promise<GroupInvitation[]> {
+  const { data, error } = await client().rpc("list_group_invitations", {
+    target_conversation_id: conversationId,
+  });
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as GroupInvitation[];
+}
+
+export async function loadMyGroupInvitations(): Promise<MyGroupInvitation[]> {
+  const { data, error } = await client().rpc("list_my_group_invitations");
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as MyGroupInvitation[];
+}
+
+export async function respondToGroupInvitation(
+  invitationId: string,
+  accept: boolean,
+): Promise<"accepted" | "declined" | "expired"> {
+  if (!invitationId) throw new Error("Choose a group invitation.");
+  const { data, error } = await client().rpc("respond_group_invitation", {
+    target_invitation_id: invitationId,
+    accept_invitation: accept,
+  });
+  if (error) throw error;
+  if (data !== "accepted" && data !== "declined" && data !== "expired") {
+    throw new Error("Supabase returned an invalid invitation response.");
+  }
+  return data;
+}
+
+export async function revokeGroupInvitation(invitationId: string): Promise<void> {
+  if (!invitationId) throw new Error("Choose an invitation to revoke.");
+  const { error } = await client().rpc("revoke_group_invitation", {
+    target_invitation_id: invitationId,
+  });
+  if (error) throw error;
 }
 
 export async function removeGroupMember(conversationId: string, userId: string): Promise<void> {

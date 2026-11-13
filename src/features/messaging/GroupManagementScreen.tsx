@@ -8,8 +8,9 @@ import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { supabase } from "../../lib/supabase";
 import {
-  addGroupMembers, loadGroupMembers, removeGroupMember, renameGroupConversation,
-  setGroupMemberRole, transferGroupOwnership, type GroupMember
+  loadGroupInvitations, loadGroupMembers, removeGroupMember, renameGroupConversation,
+  revokeGroupInvitation, sendGroupInvitation, setGroupMemberRole,
+  transferGroupOwnership, type GroupInvitation, type GroupMember
 } from "./groups";
 import { lookupProfileByUsername } from "./service";
 
@@ -23,12 +24,14 @@ type Props = {
 
 export function GroupManagementScreen({ conversationId, initialTitle, onBack, onLeft, onRenamed }: Props) {
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [title, setTitle] = useState(initialTitle);
   const [newUsername, setNewUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const currentMember = members.find(member => member.user_id === currentUserId);
   const canManage = currentMember?.member_role === "owner" || currentMember?.member_role === "admin";
@@ -43,6 +46,12 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
       setCurrentUserId(data.user.id);
       const rows = await loadGroupMembers(conversationId);
       setMembers(rows);
+      const me = rows.find(member => member.user_id === data.user.id);
+      if (me?.member_role === "owner" || me?.member_role === "admin") {
+        setInvitations(await loadGroupInvitations(conversationId));
+      } else {
+        setInvitations([]);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load group members.");
     } finally {
@@ -86,8 +95,9 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
     await run(async () => {
       const profile = await lookupProfileByUsername(username);
       if (!profile) throw new Error("No discoverable account found.");
-      await addGroupMembers(conversationId, [profile.id]);
+      await sendGroupInvitation(conversationId, profile.id);
       setNewUsername("");
+      setNotice(`Invitation sent to @${profile.username}.`);
     });
   }
 
@@ -168,13 +178,38 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
 
           {canManage ? (
             <>
-              <Text style={[styles.label, { marginTop: 22 }]}>Add a member</Text>
+              <Text style={[styles.label, { marginTop: 22 }]}>Invite a member</Text>
               <View style={styles.titleRow}>
                 <Text style={styles.at}>@</Text>
                 <TextInput value={newUsername} onChangeText={value => setNewUsername(value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())} maxLength={20} autoCapitalize="none" autoCorrect={false} placeholder="username" placeholderTextColor={palette.muted} style={styles.titleInput} returnKeyType="done" onSubmitEditing={addMember} />
                 <Pressable accessibilityRole="button" disabled={working || newUsername.length < 3} onPress={() => void addMember()} style={[styles.smallButton, (working || newUsername.length < 3) && styles.disabled]}>
-                  <Text style={styles.smallButtonText}>Add</Text>
+                  <Text style={styles.smallButtonText}>Invite</Text>
                 </Pressable>
+              </View>
+            </>
+          ) : null}
+
+          {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
+          {canManage && invitations.length > 0 ? (
+            <>
+              <Text style={[styles.label, { marginTop: 22, marginBottom: 10 }]}>Pending invitations</Text>
+              <View style={styles.memberCard}>
+                {invitations.map(invitation => (
+                  <View key={invitation.invitation_id} style={styles.invitationRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberName}>{invitation.invitee_display_name || invitation.invitee_username || "ChitChat member"}</Text>
+                      <Text style={styles.memberUsername}>@{invitation.invitee_username || "unknown"} · expires {new Date(invitation.expires_at).toLocaleDateString()}</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={working}
+                      onPress={() => void run(() => revokeGroupInvitation(invitation.invitation_id))}
+                      style={styles.memberAction}
+                    >
+                      <Text style={styles.removeText}>Revoke</Text>
+                    </Pressable>
+                  </View>
+                ))}
               </View>
             </>
           ) : null}
@@ -247,12 +282,14 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.55 },
   memberCard: { backgroundColor: palette.white, borderWidth: 1, borderColor: palette.line, borderRadius: radius.lg, paddingHorizontal: 12 },
   memberRow: { minHeight: 66, flexDirection: "row", alignItems: "center", flexWrap: "wrap", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: palette.line },
+  invitationRow: { minHeight: 60, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: palette.line, gap: 8 },
   memberName: { color: palette.ink, fontSize: 12, fontWeight: "800" },
   memberUsername: { color: palette.muted, fontSize: 10, marginTop: 3 },
   memberActions: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: 8, paddingLeft: 52, marginTop: 6 },
   memberAction: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8, justifyContent: "center", borderRadius: radius.sm, backgroundColor: "#F4F1FF" },
   removeText: { color: "#B42318", fontSize: 10, fontWeight: "800" },
   transferText: { color: palette.brand, fontSize: 10, fontWeight: "800" },
+  notice: { color: "#167A55", fontSize: 11, lineHeight: 16, marginTop: 10 },
   error: { color: "#B42318", fontSize: 12, lineHeight: 18, marginTop: 14 },
   footnote: { color: palette.muted, fontSize: 11, lineHeight: 17, textAlign: "center", marginTop: 18, paddingHorizontal: 8 },
 });

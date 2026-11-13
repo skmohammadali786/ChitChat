@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import * as ExpoLinking from "expo-linking";
+import * as Network from "expo-network";
 import {
   ActivityIndicator, Alert, AppState, Linking, View, Text, TextInput, FlatList, ScrollView, useColorScheme,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
@@ -18,6 +19,7 @@ import { EditProfileScreen } from "./src/features/auth/EditProfileScreen";
 import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScreen";
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
+import { GroupInvitationsScreen } from "./src/features/messaging/GroupInvitationsScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
@@ -58,6 +60,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showNewChat, setShowNewChat] = useState(false);
   const [showGroupCreation, setShowGroupCreation] = useState(false);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
+  const [showGroupInvitations, setShowGroupInvitations] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
   const [reportingChat, setReportingChat] = useState<Chat | null>(null);
@@ -206,6 +209,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setShowScheduledMessages(false);
     setReportingChat(null);
     setShowGroupManagement(false);
+    setShowGroupInvitations(false);
     setShowGroupCreation(false);
     setShowNewChat(false);
     setAppLockEnabled(false);
@@ -246,12 +250,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     };
 
     void retryOutbox();
-    const subscription = AppState.addEventListener("change", state => {
+    const appStateSubscription = AppState.addEventListener("change", state => {
       if (state === "active") void retryOutbox();
     });
+    const networkSubscription = Network.addNetworkStateListener(state => {
+      if (state.isConnected && state.isInternetReachable !== false) void retryOutbox();
+    });
+    void Network.getNetworkStateAsync().then(state => {
+      if (state.isConnected && state.isInternetReachable !== false) void retryOutbox();
+    }).catch(() => undefined);
     return () => {
       stopped = true;
-      subscription.remove();
+      appStateSubscription.remove();
+      networkSubscription.remove();
     };
   }, [profile?.id]);
 
@@ -725,6 +736,36 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     );
   }
 
+  if (showGroupInvitations && profile) {
+    return (
+      <AnimatedSafeAreaView key="group-invitations" style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <GroupInvitationsScreen
+          onBack={() => setShowGroupInvitations(false)}
+          onAccepted={(conversationId, title) => {
+            const initials = title.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
+            const acceptedChat: Chat = {
+              id: conversationId,
+              name: title,
+              initials: initials || "GR",
+              color: "#D8D1FF",
+              message: "Invitation accepted",
+              time: "now",
+              unread: 0,
+              isReal: true,
+              isGroup: true,
+              conversationId,
+            };
+            setChats(current => [acceptedChat, ...current.filter(chat => chat.conversationId !== conversationId)]);
+            setActiveChat(acceptedChat);
+            setTab("Chats");
+            setShowGroupInvitations(false);
+          }}
+        />
+      </AnimatedSafeAreaView>
+    );
+  }
+
   if (showScheduledMessages && profile) {
     return (
       <AnimatedSafeAreaView key="scheduled-messages" style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -1080,6 +1121,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                   : <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>Send link</Text>}
               </Pressable>
             </View>
+          ) : null}
+          {profile ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowGroupInvitations(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Group invitations</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Review and accept invitations to join groups.</Text>
+              </View>
+              <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
+            </Pressable>
           ) : null}
           {profile ? (
             <Pressable accessibilityRole="button" onPress={() => setShowGroupCreation(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
