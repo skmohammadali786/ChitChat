@@ -75,6 +75,10 @@ export function ReportConversationModal({
       setError("This conversation is not available for reporting.");
       return;
     }
+    if (targetLabel === "account" && !targetUserId) {
+      setError("The account details are unavailable. Close this form and reopen the conversation.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
