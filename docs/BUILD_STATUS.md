@@ -34,9 +34,9 @@ PR #1 remains draft. Do not merge.
 - Receipt and reaction backend services are not integrated into an active message UI.
 - Calls are a placeholder. Voice/video calling is not implemented.
 - Offline outbox, disappearing messages, encrypted search, replies, forwarding and complete message actions are absent.
-- App lock and biometric enforcement are not implemented. Settings fields alone do not provide these controls.
+- App lock is now integrated through Expo LocalAuthentication. It locks on app background and automatically prompts on foreground resume, using biometrics where available and device PIN/passcode fallback. Android/iOS lifecycle and lockout tests remain pending.
 - External secret-link endpoints/reveal page and subscription purchase/restore flows are not implemented.
-- System theme, accent palette picker, complete reduced-motion behavior and systematic accessibility tests are incomplete.
+- System/light/dark theme selection and six accent palette choices are implemented and persisted. Accent usage is not yet consistent across every screen. Reduced-motion behavior exists in SecretReveal but needs broader coverage and testing. Systematic TalkBack/VoiceOver tests are incomplete.
 - No committed `package-lock.json` exists. Current CI uses `npm install`, so dependency resolution is not reproducible.
 - The five initial migration files missing from the branch have been restored as a consolidated bootstrap baseline plus four historical no-op placeholders. A completely clean Supabase migration test has not yet been run, so fresh-install reproducibility remains unverified.
 - Latest recorded GitHub Actions run failed before any job steps were reported. TypeScript, Expo Doctor, Rust tests, rustfmt and Clippy have not been verified.
@@ -78,14 +78,14 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - A scheduled-message manager allows users to list and cancel pending entries. Scheduling new messages remains disabled until MLS encryption is implemented.
 - Direct-account and group report actions call a private membership-checked RPC with reason validation and a five-per-hour rate limit. A reviewer console and moderation workflow are not implemented.
 - The message, scheduled-message and media service methods now independently enforce the fail-closed crypto gate, not just the UI.
-- Reporting migrations are recorded as `20261113030813_add_conversation_reporting` and `20261113031015_index_message_reports_target_user`. Security and health advisors returned no lints after these changes.
+- Reporting migrations include conversation/account reporting, target-user indexing, message report validation and transaction-serialized five-per-hour throttling across both report endpoints. Security and health advisors returned no lints.
 
 
 ## App lock implementation
 
 - Added `expo-local-authentication` for Expo SDK 58 and configured the iOS Face ID usage description.
 - Signed-in users can enable app lock after authenticating with a configured device credential.
-- When enabled, the app locks whenever it leaves the foreground and requires device authentication before reopening conversations. The native OS flow can use biometrics or device PIN/passcode fallback.
+- When enabled, the app locks whenever it leaves the foreground and automatically requests device authentication on resume before reopening conversations. The native OS flow can use biometrics or device PIN/passcode fallback.
 - This source integration has not yet been exercised in Android/iOS development builds. App-switching, cancellation, lockout, enrollment changes and notification-opening behavior must be tested on physical devices.
 
 
