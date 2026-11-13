@@ -17,7 +17,7 @@ Reference: https://github.com/meta/astryx
 - Space: a 4-point base scale.
 - Shape: small, medium, large, and pill radii.
 - Type: caption, body, title, heading, and display roles.
-- Motion: short state transitions and spring-based reveal, with a reduced-motion fallback planned before release.
+- Motion: short state transitions and spring-based reveal, with shared page transitions and spring-based press feedback. Both honor the operating system reduced-motion preference.
 
 ## Component conventions
 - Prefer semantic props such as `disabled`, `selected`, `loading`, and `tone`.
@@ -27,6 +27,8 @@ Reference: https://github.com/meta/astryx
 - Use platform-native behavior for navigation, keyboard handling, and touch feedback.
 
 ## Current implementation
+- `src/components/ScreenTransition.tsx`: shared page and tab entrance transitions, with reduced-motion support.
+- `src/components/MotionPressable.tsx`: shared animated press feedback and Android ripple, with reduced-motion support.
 - Tokens: `src/theme/tokens.ts`
 - Avatar: `src/components/Avatar.tsx`
 - Secret reveal: `src/components/SecretReveal.tsx`

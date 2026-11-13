@@ -102,7 +102,7 @@ Legend:
 | Light/dark/system themes | PARTIAL | System/light/dark selection now follows OS appearance and syncs to Supabase; full token coverage across every screen remains |
 | Accent palette selection | PARTIAL | Six palette choices now persist locally and to Supabase and recolor primary controls; full all-screen token coverage remains |
 | Design system | PARTIAL | Astryx-informed conventions, reusable components and state coverage |
-| Reduced motion | PARTIAL | All reveal and navigation animation respects OS setting |
+| Reduced motion | PARTIAL | Shared page transitions, button feedback and secret reveal respect the OS setting; verify all future motion surfaces and reduced-motion behavior on physical devices |
 | Accessibility | NOT STARTED | TalkBack, VoiceOver, focus order, labels, contrast and touch targets |
 | Android release build | NOT STARTED | Rust module linked, APK/AAB built and device tested |
 | iOS release build | NOT STARTED | Rust module linked, IPA built and device tested |
