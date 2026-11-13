@@ -86,6 +86,7 @@ export async function createCallSession(
   if (error) throw error;
   if (typeof data !== "string" || !data) throw new Error("Supabase returned an invalid call ID.");
 
+  let realtimeDelivered = false;
   try {
     await sendInboxEvent(calleeId, {
       call_id: data,
@@ -93,27 +94,38 @@ export async function createCallSession(
       call_type: callType,
       created_at: new Date().toISOString(),
     });
+    realtimeDelivered = true;
   } catch (error) {
+    console.warn("ChitChat incoming-call Realtime delivery failed.", error);
+  }
+
+  // Realtime reaches subscribed foreground devices. The authenticated push
+  // fallback wakes devices whose app is backgrounded or terminated.
+  let pushDelivered = false;
+  try {
+    const { data: notification, error: pushError } = await client().functions.invoke("notify-call", {
+      body: { call_id: data },
+    });
+    if (pushError) {
+      console.warn("ChitChat incoming-call notification failed.", pushError.message);
+    } else {
+      pushDelivered = Number((notification as { sent?: unknown } | null)?.sent ?? 0) > 0;
+    }
+  } catch (error) {
+    console.warn("ChitChat incoming-call notification request failed.", error);
+  }
+
+  if (!realtimeDelivered && !pushDelivered) {
     try {
       await client().rpc("end_call_session", {
         target_call_id: data,
-        requested_reason: "ring_delivery_failed",
+        requested_reason: "call_alert_delivery_failed",
       });
     } catch {
-      // The server-side 45-second expiry marks undelivered calls as missed.
+      // The server-side 45-second expiry still closes an undelivered session.
     }
-    throw error;
+    throw new Error("ChitChat could not notify the recipient. The call request was cancelled.");
   }
-  // Realtime handles foreground devices. This generic push wakes devices
-  // whose app is backgrounded or terminated. Push failure must not cancel
-  // an otherwise valid ringing session.
-  void client().functions.invoke("notify-call", {
-    body: { call_id: data },
-  }).then(({ error: pushError }) => {
-    if (pushError) console.warn("ChitChat incoming-call notification failed.", pushError.message);
-  }).catch(error => {
-    console.warn("ChitChat incoming-call notification request failed.", error);
-  });
 
   return data;
 }

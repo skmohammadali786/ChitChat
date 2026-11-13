@@ -18,27 +18,30 @@ function easProjectId(): string {
   return projectId;
 }
 
+async function configureAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Notifications.setNotificationChannelAsync("messages", {
+    name: "Messages",
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 180, 100, 180],
+    lightColor: "#7665D8",
+  });
+  await Notifications.setNotificationChannelAsync("calls", {
+    name: "Calls",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 260, 160, 260, 160, 260],
+    lightColor: "#7665D8",
+    sound: "default",
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+}
+
 export async function enablePushNotifications(): Promise<string> {
   const platform = nativePlatform();
   const projectId = easProjectId();
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  if (platform === "android") {
-    await Notifications.setNotificationChannelAsync("messages", {
-      name: "Messages",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 100, 180],
-      lightColor: "#7665D8",
-    });
-    await Notifications.setNotificationChannelAsync("calls", {
-      name: "Calls",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 260, 160, 260, 160, 260],
-      lightColor: "#7665D8",
-      sound: "default",
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
-    });
-  }
+  await configureAndroidNotificationChannels();
 
   const existing = await Notifications.getPermissionsAsync();
   let permission = existing;
@@ -68,6 +71,7 @@ export async function syncPushRegistrationIfGranted(): Promise<boolean> {
   const platform = nativePlatform();
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) return false;
+  await configureAndroidNotificationChannels();
   const projectId = easProjectId();
   const result = await Notifications.getExpoPushTokenAsync({ projectId });
   await registerPushDevice(result.data, platform);
