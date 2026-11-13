@@ -7,6 +7,7 @@
 use std::{
     fs,
     path::PathBuf,
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
@@ -64,6 +65,8 @@ pub struct ChitChatMlsBridge {
     runtime: Mutex<MlsRuntime>,
     device_identity: Mutex<Option<DeviceIdentity>>,
     device_identity_path: PathBuf,
+    local_message_cache_path: PathBuf,
+    local_message_cache: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,6 +74,11 @@ struct ProtectedDeviceIdentityRecord {
     user_id: Uuid,
     device_id: Uuid,
     private_material: Vec<u8>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct LocalMessageCache {
+    entries: HashMap<String, String>,
 }
 
 #[uniffi::export]
@@ -107,11 +115,21 @@ impl ChitChatMlsBridge {
                 return Err(error);
             }
         };
+        let local_message_cache_path = PathBuf::from(format!("{database_path}.local-message-cache.v1"));
+        let local_message_cache = match load_local_message_cache(&local_message_cache_path) {
+            Ok(cache) => cache,
+            Err(error) => {
+                let _ = clear_mls_storage_key();
+                return Err(error);
+            }
+        };
 
         Ok(Arc::new(Self {
             runtime: Mutex::new(runtime),
             device_identity: Mutex::new(device_identity),
             device_identity_path,
+            local_message_cache_path,
+            local_message_cache: Mutex::new(local_message_cache),
         }))
     }
 
@@ -126,6 +144,9 @@ impl ChitChatMlsBridge {
         let mut identity = self.device_identity.lock()
             .map_err(|_| ChitChatBridgeError::from_message("Device identity lock is unavailable."))?;
         *identity = None;
+        self.local_message_cache.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Local message cache lock is unavailable."))?
+            .clear();
         clear_mls_storage_key()
             .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))
     }
@@ -215,6 +236,65 @@ impl ChitChatMlsBridge {
         Ok(URL_SAFE_NO_PAD.encode(bytes))
     }
 
+    /// Persist the sender's own plaintext content only inside the encrypted local cache,
+    /// then encrypt it for transport. This is needed because OpenMLS reports a local
+    /// message echo without returning the original plaintext to its author.
+    pub fn encrypt_content_for_message(
+        &self,
+        group_id: String,
+        message_id: String,
+        content_json: String,
+    ) -> Result<String, ChitChatBridgeError> {
+        Uuid::parse_str(&message_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The local message ID is invalid."))?;
+        let content: MessageContent = serde_json::from_str(&content_json)
+            .map_err(|_| ChitChatBridgeError::from_core(CoreError::InvalidMessageContent))?;
+        validate_message_content(&content).map_err(ChitChatBridgeError::from_core)?;
+        let canonical_json = serde_json::to_string(&content)
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+        self.store_local_message_content(message_id, canonical_json)?;
+        let runtime = self.runtime.lock().map_err(|_| ChitChatBridgeError::from_message("MLS runtime lock is unavailable."))?;
+        let bytes = runtime.encrypt_content(&group_id, &content).map_err(ChitChatBridgeError::from_core)?;
+        Ok(URL_SAFE_NO_PAD.encode(bytes))
+    }
+
+    pub fn store_local_message_content(
+        &self,
+        message_id: String,
+        content_json: String,
+    ) -> Result<(), ChitChatBridgeError> {
+        Uuid::parse_str(&message_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The local message ID is invalid."))?;
+        let content: MessageContent = serde_json::from_str(&content_json)
+            .map_err(|_| ChitChatBridgeError::from_core(CoreError::InvalidMessageContent))?;
+        validate_message_content(&content).map_err(ChitChatBridgeError::from_core)?;
+        let canonical_json = serde_json::to_string(&content)
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+        let mut cache = self.local_message_cache.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Local message cache lock is unavailable."))?;
+        if cache.len() >= 20_000 && !cache.contains_key(&message_id) {
+            return Err(ChitChatBridgeError::from_message("The protected local message cache is full."));
+        }
+        let previous = cache.insert(message_id.clone(), canonical_json);
+        if let Err(error) = persist_local_message_cache(&self.local_message_cache_path, &cache) {
+            match previous {
+                Some(value) => { cache.insert(message_id, value); }
+                None => { cache.remove(&message_id); }
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub fn get_local_message_content(&self, message_id: String) -> Result<String, ChitChatBridgeError> {
+        Uuid::parse_str(&message_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The local message ID is invalid."))?;
+        let cache = self.local_message_cache.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Local message cache lock is unavailable."))?;
+        cache.get(&message_id).cloned()
+            .ok_or_else(|| ChitChatBridgeError::from_message("The message content is not available in this device's protected local cache."))
+    }
+
     /// Authenticate and decrypt an incoming MLS wire message. Application
     /// content is returned as JSON; callers must not render it before success.
     /// allow_control_messages must only be true after a server-authorized
@@ -265,12 +345,15 @@ impl ChitChatMlsBridge {
         &self,
         group_id: String,
         object_id: String,
+        message_id: String,
         plaintext: Vec<u8>,
         media_kind: String,
         concealed: bool,
     ) -> Result<String, ChitChatBridgeError> {
         let object_id = Uuid::parse_str(&object_id)
             .map_err(|_| ChitChatBridgeError::from_message("Media object ID is invalid."))?;
+        Uuid::parse_str(&message_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The local message ID is invalid."))?;
         let kind = parse_media_kind(&media_kind)?;
         let encrypted = encrypt_media(&plaintext, kind).map_err(ChitChatBridgeError::from_core)?;
         let content = MessageContent {
@@ -287,6 +370,9 @@ impl ChitChatMlsBridge {
             }],
         };
         validate_message_content(&content).map_err(ChitChatBridgeError::from_core)?;
+        let content_json = serde_json::to_string(&content)
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+        self.store_local_message_content(message_id, content_json)?;
         let runtime = self.runtime.lock().map_err(|_| ChitChatBridgeError::from_message("MLS runtime lock is unavailable."))?;
         let key_envelope = runtime.encrypt_content(&group_id, &content)
             .map_err(ChitChatBridgeError::from_core)?;
@@ -352,6 +438,35 @@ impl Drop for ChitChatMlsBridge {
     fn drop(&mut self) {
         let _ = clear_mls_storage_key();
     }
+}
+
+fn load_local_message_cache(path: &PathBuf) -> Result<HashMap<String, String>, ChitChatBridgeError> {
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let encrypted = fs::read(path)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    let cache: LocalMessageCache = ChitChatStorageCodec::from_slice(&encrypted)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    Ok(cache.entries)
+}
+
+fn persist_local_message_cache(
+    path: &PathBuf,
+    entries: &HashMap<String, String>,
+) -> Result<(), ChitChatBridgeError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    }
+    let encrypted = ChitChatStorageCodec::to_vec(&LocalMessageCache { entries: entries.clone() })
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    let temporary = path.with_extension("tmp");
+    fs::write(&temporary, encrypted)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    fs::rename(&temporary, path)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    Ok(())
 }
 
 fn persist_device_identity(
