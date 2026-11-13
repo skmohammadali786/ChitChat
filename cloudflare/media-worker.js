@@ -8,8 +8,8 @@ function response(body, status, request) {
     "cache-control": "no-store",
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256",
-    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version",
+    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
+    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope",
     "vary": "Origin",
   });
   return new Response(JSON.stringify(body), { status, headers });
@@ -54,7 +54,7 @@ async function isConversationMember(env, token, userId, conversationId) {
 
 async function getMediaRow(env, token, id) {
   const query = new URLSearchParams({
-    select: "id,owner_id,conversation_id,media_kind,object_key,size_bytes,content_sha256,crypto_version,created_at",
+    select: "id,owner_id,conversation_id,media_kind,object_key,size_bytes,content_sha256,crypto_version,key_envelope,created_at",
     id: `eq.${id}`,
     limit: "1",
   });
@@ -84,6 +84,8 @@ async function upload(request, env, user, conversationId, mediaKind) {
   if (!SHA256_RE.test(digest)) return response({ error: "A SHA-256 digest of the encrypted bytes is required." }, 400, request);
   const cryptoVersion = Number(request.headers.get("x-chitchat-crypto-version") || "0");
   if (!Number.isInteger(cryptoVersion) || cryptoVersion < 1) return response({ error: "A valid Rust media crypto version is required." }, 400, request);
+  const keyEnvelope = request.headers.get("x-chitchat-key-envelope") || "";
+  if (keyEnvelope.length < 32 || keyEnvelope.length > 8_192 || !/^[A-Za-z0-9_+\\/=.-]+$/.test(keyEnvelope)) return response({ error: "A valid encrypted media key envelope is required." }, 400, request);
   if (!request.body) return response({ error: "The upload body is empty." }, 400, request);
   const declaredLength = Number(request.headers.get("content-length") || "0");
   if (declaredLength > MAX_UPLOAD_BYTES) return response({ error: "Media uploads are limited to 50 MB." }, 413, request);
@@ -119,6 +121,7 @@ async function upload(request, env, user, conversationId, mediaKind) {
       size_bytes: actualBytes,
       content_sha256: digest,
       crypto_version: cryptoVersion,
+      key_envelope: keyEnvelope,
       encrypted: true,
     };
     const insert = await supabaseRequest(env, user.token, "/rest/v1/media_objects", {
@@ -170,6 +173,7 @@ async function download(request, env, user, id) {
     "cache-control": "private, no-store",
     "x-content-sha256": row.content_sha256,
     "x-chitchat-crypto-version": String(row.crypto_version),
+    "x-chitchat-key-envelope": row.key_envelope || "",
     "etag": object.httpEtag,
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",

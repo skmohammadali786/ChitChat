@@ -34,6 +34,28 @@
         {
           "faceIDPermission": "Allow ChitChat to use Face ID to unlock your private messages."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ChitChat to choose an image for your encrypted profile avatar or message attachment.",
+          "cameraPermission": "Allow ChitChat to capture media for an encrypted message.",
+          "microphonePermission": "Allow ChitChat to record audio for an encrypted message."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow ChitChat to record audio messages.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
       ]
     ]
   }

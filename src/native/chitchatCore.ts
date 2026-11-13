@@ -1,5 +1,36 @@
 import { NativeModules, Platform } from "react-native";
 
+export type NativeEncryptedMedia = {
+  ciphertext_base64: string;
+  key_envelope: string;
+  sha256: string;
+  crypto_version: number;
+};
+
+function parseNativeEncryptedMedia(raw: string): NativeEncryptedMedia {
+  let value: NativeEncryptedMedia;
+  try {
+    value = JSON.parse(raw) as NativeEncryptedMedia;
+  } catch {
+    throw new Error("The Rust media module returned invalid metadata.");
+  }
+  if (
+    typeof value.ciphertext_base64 !== "string" ||
+    value.ciphertext_base64.length < 4 ||
+    value.ciphertext_base64.length > 70_000_000 ||
+    typeof value.key_envelope !== "string" ||
+    value.key_envelope.length < 32 ||
+    value.key_envelope.length > 8_192 ||
+    !/^[A-Za-z0-9_+\/=.-]+$/.test(value.key_envelope) ||
+    !/^[a-f0-9]{64}$/.test(value.sha256) ||
+    !Number.isInteger(value.crypto_version) ||
+    value.crypto_version < 1
+  ) {
+    throw new Error("The Rust media module returned an invalid encrypted-media envelope.");
+  }
+  return value;
+}
+
 export type DevicePublicBundle = {
   device_id: string;
   user_id: string;
@@ -62,13 +93,51 @@ export const chitchatCore = {
   },
 
   get mediaCryptoAvailable(): boolean {
-    return Platform.OS !== "web" && typeof nativeCore?.encryptMediaFile === "function";
+    return Platform.OS !== "web"
+      && typeof nativeCore?.encryptMediaFile === "function"
+      && typeof nativeCore?.isProtectedStorageReady === "function";
   },
 
   get avatarCryptoAvailable(): boolean {
     return Platform.OS !== "web"
       && typeof nativeCore?.encryptAvatarFile === "function"
-      && typeof nativeCore?.decryptAvatarFile === "function";
+      && typeof nativeCore?.decryptAvatarFile === "function"
+      && typeof nativeCore?.isProtectedStorageReady === "function";
+  },
+
+  async encryptMediaFile(uri: string, conversationId: string, mediaKind: "image" | "video" | "audio" | "file"): Promise<NativeEncryptedMedia> {
+    if (!uri || !conversationId || !chitchatCore.mediaCryptoAvailable || !nativeCore?.encryptMediaFile) {
+      throw new Error("The protected Rust media encryption module is not linked in this build.");
+    }
+    if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
+      throw new Error("Protected MLS storage is locked. Media was not encrypted or uploaded.");
+    }
+    return parseNativeEncryptedMedia(await nativeCore.encryptMediaFile(uri, conversationId, mediaKind));
+  },
+
+  async encryptAvatarFile(uri: string): Promise<NativeEncryptedMedia> {
+    if (!uri || !chitchatCore.avatarCryptoAvailable || !nativeCore?.encryptAvatarFile) {
+      throw new Error("The protected Rust avatar encryption module is not linked in this build.");
+    }
+    if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
+      throw new Error("Protected device storage is locked. The avatar was not encrypted or uploaded.");
+    }
+    return parseNativeEncryptedMedia(await nativeCore.encryptAvatarFile(uri));
+  },
+
+  async decryptAvatarFile(
+    mediaId: string,
+    ciphertextBase64: string,
+    metadata: { keyEnvelope: string; sha256: string; cryptoVersion: number },
+  ): Promise<string> {
+    if (!mediaId || !chitchatCore.avatarCryptoAvailable || !nativeCore?.decryptAvatarFile) {
+      throw new Error("The protected Rust avatar decryptor is not linked in this build.");
+    }
+    const uri = await nativeCore.decryptAvatarFile(mediaId, ciphertextBase64, JSON.stringify(metadata));
+    if (typeof uri !== "string" || !uri.startsWith("file://")) {
+      throw new Error("The native avatar decryptor did not return a private local file URI.");
+    }
+    return uri;
   },
 
   async createDeviceIdentity(userId: string): Promise<DevicePublicBundle> {

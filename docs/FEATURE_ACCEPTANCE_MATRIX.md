@@ -16,7 +16,7 @@ Legend:
 | Username and profile | PARTIAL | Unique username, display name, bio, onboarding and editing are wired; profile discovery privacy is editable in Settings and Edit Profile; encrypted avatar picker/decrypt/display and device tests remain |
 | Username discovery | PARTIAL | Exact lookup, opt-in discoverability from onboarding, Settings and Edit Profile, rate limits and block filtering; Android/iOS acceptance tests remain |
 | Optional phone discovery | NOT STARTED | Explicit permission, normalized phone matching, privacy controls |
-| Profile avatar | PARTIAL | Encrypted Rust output, private R2 upload, authorized download and update |
+| Profile avatar | PARTIAL | SDK58 image picker, private R2 encrypted-byte upload, authenticated avatar download and native decrypt contract are wired; native avatar-key wrapping, cross-device key availability and device tests remain |
 
 ## One-to-one and group messaging
 
@@ -56,8 +56,8 @@ Legend:
 | Cloudflare R2 private bucket | DONE | Private bucket created; public r2.dev domain disabled |
 | Authenticated media API | PARTIAL | Worker deployed; unauthenticated requests rejected; signed-in upload/download integration tests still required |
 | Supabase media metadata | PARTIAL | RLS table and migration installed; authenticated device-level tests required |
-| Rust media encryption | PARTIAL | XChaCha20-Poly1305 file encryption/decryption, fresh per-object key/nonce, media-kind associated data, SHA-256 integrity and crypto-version checks are implemented in Rust; native bridge and chunked streaming remain |
-| Image/video/audio/file picker | NOT STARTED | Native pickers, size limits, upload progress and retry |
+| Rust media encryption | PARTIAL | Rust XChaCha20-Poly1305 encryption/decryption, per-object key/nonce, media-kind associated data, SHA-256 integrity and crypto-version checks are implemented; media picker services and authenticated R2 key-envelope metadata are wired; native bridge, MLS key wrapping, chunked streaming and device tests remain |
+| Image/video/audio/file picker | PARTIAL | SDK58 image/video and document/audio picker services enforce 50 MB limits and copy selected files to app cache; encryption/upload progress and retry UI still require the native media bridge and encrypted composer |
 | Large media | NOT STARTED | Resumable/multipart upload, pause/resume and cleanup |
 | Media expiry and cleanup | NOT STARTED | Delete expired R2 objects and Supabase metadata safely |
 | Emoji in messages | PARTIAL | Rust payload model preserves Unicode/emoji text; MLS encryption and real message transport remain |

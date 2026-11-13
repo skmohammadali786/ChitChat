@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabase";
 import { assertSecureMessagingAvailable } from "./cryptoGate";
+import { chitchatCore } from "../../native/chitchatCore";
 
 const mediaApiUrl = process.env.EXPO_PUBLIC_MEDIA_API_URL?.trim().replace(/\/$/, "");
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
@@ -13,6 +14,8 @@ export type EncryptedMediaPayload = {
   sha256: string;
   /** Protocol version used to encrypt the payload. */
   cryptoVersion: number;
+  /** Encrypted file-key envelope. This is MLS-protected for message media. */
+  keyEnvelope: string;
 };
 
 export type StoredMedia = {
@@ -75,6 +78,8 @@ export async function uploadEncryptedMedia(
         "x-chitchat-media-kind": mediaKind,
         "x-content-sha256": payload.sha256,
         "x-chitchat-crypto-version": String(payload.cryptoVersion),
+      "x-chitchat-key-envelope": payload.keyEnvelope,
+        "x-chitchat-key-envelope": payload.keyEnvelope,
       },
       body: payload.bytes,
     },
@@ -83,9 +88,97 @@ export async function uploadEncryptedMedia(
   return await response.json() as StoredMedia;
 }
 
+function decodeBase64(value: string): ArrayBuffer {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 === 1) {
+    throw new Error("The native Rust module returned invalid base64 ciphertext.");
+  }
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  const outputLength = Math.floor(normalized.length * 3 / 4) - padding;
+  const output = new Uint8Array(outputLength);
+  let buffer = 0;
+  let bits = 0;
+  let offset = 0;
+  for (let index = 0; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    if (character === "=") break;
+    const digit = alphabet.indexOf(character);
+    if (digit < 0) throw new Error("The native Rust module returned invalid base64 ciphertext.");
+    buffer = (buffer << 6) | digit;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      if (offset < output.length) output[offset++] = (buffer >> bits) & 0xff;
+      buffer &= (1 << bits) - 1;
+    }
+  }
+  if (offset !== output.length) throw new Error("The encrypted media payload was truncated.");
+  return output.buffer;
+}
+
+function encodeBase64(bytes: ArrayBuffer): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const input = new Uint8Array(bytes);
+  let output = "";
+  for (let index = 0; index < input.length; index += 3) {
+    const a = input[index];
+    const hasB = index + 1 < input.length;
+    const hasC = index + 2 < input.length;
+    const b = hasB ? input[index + 1] : 0;
+    const c = hasC ? input[index + 2] : 0;
+    output += alphabet[a >> 2];
+    output += alphabet[((a & 3) << 4) | (b >> 4)];
+    output += hasB ? alphabet[((b & 15) << 2) | (c >> 6)] : "=";
+    output += hasC ? alphabet[c & 63] : "=";
+  }
+  return output;
+}
+
+export async function encryptAndUploadMedia(
+  conversationId: string,
+  uri: string,
+  kind: MediaKind,
+): Promise<{ media: StoredMedia; keyEnvelope: string }> {
+  assertSecureMessagingAvailable();
+  const prepared = await chitchatCore.encryptMediaFile(uri, conversationId, kind);
+  const media = await uploadEncryptedMedia(conversationId, kind, {
+    bytes: decodeBase64(prepared.ciphertext_base64),
+    sha256: prepared.sha256,
+    cryptoVersion: prepared.crypto_version,
+    keyEnvelope: prepared.key_envelope,
+  });
+  return { media, keyEnvelope: prepared.key_envelope };
+}
+
+export async function encryptAndUploadAvatar(uri: string): Promise<StoredMedia> {
+  if (!chitchatCore.avatarCryptoAvailable) {
+    throw new Error("The protected Rust avatar encryption module is not linked in this build. No avatar was uploaded.");
+  }
+  const prepared = await chitchatCore.encryptAvatarFile(uri);
+  return uploadEncryptedAvatar({
+    bytes: decodeBase64(prepared.ciphertext_base64),
+    sha256: prepared.sha256,
+    cryptoVersion: prepared.crypto_version,
+    keyEnvelope: prepared.key_envelope,
+  });
+}
+
+export async function getDecryptedAvatarUri(mediaId: string): Promise<string> {
+  if (!chitchatCore.avatarCryptoAvailable) throw new Error("The protected Rust avatar decryptor is not linked in this build.");
+  const encrypted = await downloadEncryptedMedia(mediaId);
+  return chitchatCore.decryptAvatarFile(mediaId, encodeBase64(encrypted.bytes), {
+    keyEnvelope: encrypted.keyEnvelope,
+    sha256: encrypted.sha256,
+    cryptoVersion: encrypted.cryptoVersion,
+  });
+}
+
 /** Upload an already encrypted avatar. The Worker updates profiles.avatar_path. */
 export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Promise<StoredMedia> {
-  assertSecureMessagingAvailable();
+  if (!chitchatCore.avatarCryptoAvailable) throw new Error("The protected Rust avatar encryption module is not linked in this build.");
+  if (!payload.keyEnvelope || payload.keyEnvelope.length < 32 || payload.keyEnvelope.length > 8_192) throw new Error("An encrypted avatar key envelope is required.");
+  if (!payload.keyEnvelope || payload.keyEnvelope.length < 32 || payload.keyEnvelope.length > 8_192) throw new Error("An encrypted media key envelope is required.");
   if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_MEDIA_BYTES) {
     throw new Error("Encrypted avatar must be between 1 byte and 50 MB.");
   }
@@ -112,6 +205,7 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   bytes: ArrayBuffer;
   sha256: string;
   cryptoVersion: number;
+  keyEnvelope: string;
 }> {
   if (!mediaId) throw new Error("A media ID is required.");
   const token = await sessionToken();
@@ -121,8 +215,9 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   if (!response.ok) throw await readError(response);
   const sha256 = response.headers.get("x-content-sha256") || "";
   const cryptoVersion = Number(response.headers.get("x-chitchat-crypto-version") || "0");
-  if (!/^[a-f0-9]{64}$/.test(sha256) || !Number.isInteger(cryptoVersion) || cryptoVersion < 1) throw new Error("The stored media encryption metadata is invalid.");
-  return { bytes: await response.arrayBuffer(), sha256, cryptoVersion };
+  const keyEnvelope = response.headers.get("x-chitchat-key-envelope") || "";
+  if (!/^[a-f0-9]{64}$/.test(sha256) || !Number.isInteger(cryptoVersion) || cryptoVersion < 1 || keyEnvelope.length < 32 || keyEnvelope.length > 8_192) throw new Error("The stored media encryption metadata is invalid.");
+  return { bytes: await response.arrayBuffer(), sha256, cryptoVersion, keyEnvelope };
 }
 
 export async function deleteEncryptedMedia(mediaId: string): Promise<void> {
