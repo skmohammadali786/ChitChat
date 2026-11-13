@@ -19,6 +19,15 @@ export const palette = {
   darkLine: "#2A3241"
 } as const;
 
+export const accentPalettes = {
+  violet: "#6D5CE8",
+  ocean: "#2878C7",
+  emerald: "#16845F",
+  rose: "#D34F83",
+  amber: "#B87922",
+  graphite: "#64748B",
+} as const;
+
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 36 } as const;
 export const radius = { sm: 10, md: 16, lg: 22, pill: 999 } as const;
 export const typeScale = { caption: 12, small: 13, body: 15, title: 19, heading: 26, display: 32 } as const;
