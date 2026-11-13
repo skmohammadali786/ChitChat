@@ -29,7 +29,7 @@ import { DeviceVerificationScreen } from "./src/features/security/DeviceVerifica
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, subscribeToEncryptedMessages, type DiscoverableProfile, type EncryptedMessageRecord } from "./src/features/messaging/service";
-import { decryptMlsMessage, loadDecryptedMlsHistory, sendMlsTextMessage } from "./src/features/messaging/mlsTransport";
+import { decryptMlsMessage, loadDecryptedMlsHistory, sendMlsTextMessage, syncConversationMlsGroup } from "./src/features/messaging/mlsTransport";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { flushPendingEncryptedMessages } from "./src/features/messaging/delivery";
 import { listPendingEncryptedMessages } from "./src/features/messaging/outbox";
@@ -125,7 +125,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     });
     const unsubscribe = subscribeToEncryptedMessages(conversationId, record => {
       if (cancelled || record.expires_at && Date.parse(record.expires_at) <= Date.now()) return;
-      void decryptMlsMessage(record).then(content => {
+      void decryptMlsMessage(record).catch(async () => {
+        await syncConversationMlsGroup(conversationId);
+        return decryptMlsMessage(record);
+      }).then(content => {
         if (cancelled) return;
         const message = toUiMessage(record, content.blocks);
         setRealMessagesByChat(current => {
@@ -134,15 +137,24 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           return { ...current, [activeChat.id]: [...existing, message] };
         });
       }).catch(() => {
-        if (!cancelled) setRealMessageError("A new message failed MLS authentication and was not displayed.");
+        if (!cancelled) setRealMessageError("A new message failed MLS authentication or group synchronization and was not displayed.");
       });
     }, status => {
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         setRealMessageError("Realtime is disconnected. Pull to refresh to load encrypted history.");
       }
     });
+    // MLS Welcome and Commit delivery is authorized through narrow RPCs.
+    // Poll while this conversation is open so a newly issued Welcome is joined
+    // and queued Commits are merged before subsequent messages are rendered.
+    const mlsSyncTimer = setInterval(() => {
+      void syncConversationMlsGroup(conversationId).catch(error => {
+        if (!cancelled) setRealMessageError(error instanceof Error ? error.message : "MLS synchronization failed.");
+      });
+    }, 12000);
     return () => {
       cancelled = true;
+      clearInterval(mlsSyncTimer);
       unsubscribe();
     };
   }, [activeChat?.id, activeChat?.conversationId, activeChat?.isReal, profile?.id]);
