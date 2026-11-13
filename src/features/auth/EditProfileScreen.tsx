@@ -52,7 +52,7 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
           username: cleanUsername,
           display_name: cleanDisplayName,
           bio: cleanBio,
-          discoverable: profile.discoverable,
+          discoverable,
         });
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "The Rust profile validator rejected these details.");
