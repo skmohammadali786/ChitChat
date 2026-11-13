@@ -81,6 +81,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [pushError, setPushError] = useState("");
   const [notificationPreview, setNotificationPreview] = useState<"none" | "sender" | "full">("sender");
   const [securitySettingsReady, setSecuritySettingsReady] = useState(!profile);
+  const [securitySettingsAccountId, setSecuritySettingsAccountId] = useState<string | null>(profile?.id ?? null);
   const [appLockEnabled, setAppLockEnabled] = useState(false);
   const [appLocked, setAppLocked] = useState(Boolean(profile));
   const [appLockError, setAppLockError] = useState("");
@@ -183,6 +184,23 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     }
   }
 
+  useEffect(() => {
+    setChats(profile ? [] : initialChats);
+    setActiveChat(null);
+    setDraft("");
+    setDraftSecret(false);
+    setShowArchivedConversations(false);
+    setShowScheduledMessages(false);
+    setShowGroupManagement(false);
+    setShowGroupCreation(false);
+    setShowNewChat(false);
+    setAppLockEnabled(false);
+    setAppLocked(Boolean(profile));
+    setAppLockError("");
+    setSecuritySettingsReady(!profile);
+    setSecuritySettingsAccountId(profile?.id ?? null);
+  }, [profile?.id]);
+
   const filteredChats = useMemo(() => chats
     .filter(chat => (showArchivedConversations ? Boolean(chat.archivedAt) : !chat.archivedAt && !chat.hiddenAt) &&
       chat.name.toLowerCase().includes(search.toLowerCase()))
@@ -195,6 +213,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   useEffect(() => {
     if (!profile || !supabase) {
       setSecuritySettingsReady(true);
+      setSecuritySettingsAccountId(null);
       setAppLockEnabled(false);
       setAppLocked(false);
       return;
@@ -216,9 +235,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       setAppLocked(saved.app_lock_enabled);
       setAppLockError("");
     }).catch(error => {
-      if (active) setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
+      if (active) {
+        setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
+        setAppLockEnabled(true);
+        setAppLocked(true);
+      }
     }).finally(() => {
-      if (active) setSecuritySettingsReady(true);
+      if (active) {
+        setSecuritySettingsAccountId(profile.id);
+        setSecuritySettingsReady(true);
+      }
     });
     return () => { active = false; };
   }, [profile?.id]);
@@ -363,12 +389,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           hiddenAt: preference?.hidden_at ?? null,
         };
       });
-      setChats(old => {
-        const merged = new Map<string, Chat>();
-        for (const chat of loadedChats) merged.set(chat.id, chat);
-        for (const chat of old) if (!merged.has(chat.id)) merged.set(chat.id, chat);
-        return [...merged.values()];
-      });
+      setChats(loadedChats);
     }).catch(caught => {
       if (active) setConversationLoadError(caught instanceof Error ? caught.message : "Could not load conversations and their preferences.");
     });
@@ -561,7 +582,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     </View>
   );
 
-  if (profile && !securitySettingsReady) {
+  if (profile && (!securitySettingsReady || securitySettingsAccountId !== profile.id)) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={accentColor} />
