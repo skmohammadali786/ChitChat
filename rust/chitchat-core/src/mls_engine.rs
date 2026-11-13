@@ -15,6 +15,7 @@ pub const CHITCHAT_CIPHERSUITE: Ciphersuite =
     Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
 
 /// Create a fresh MLS credential and signer for a single device identity.
+#[cfg(test)]
 fn test_identity(
     provider: &OpenMlsRustCrypto,
     identity: &[u8],

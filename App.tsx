@@ -22,6 +22,7 @@ import { GroupManagementScreen } from "./src/features/messaging/GroupManagementS
 import { GroupInvitationsScreen } from "./src/features/messaging/GroupInvitationsScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
+import { DeviceManagementScreen } from "./src/features/security/DeviceManagementScreen";
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
@@ -63,6 +64,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showGroupInvitations, setShowGroupInvitations] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
+  const [showDeviceManagement, setShowDeviceManagement] = useState(false);
   const [reportingChat, setReportingChat] = useState<Chat | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
@@ -207,6 +209,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setDraftSecret(false);
     setConversationListMode("inbox");
     setShowScheduledMessages(false);
+    setShowDeviceManagement(false);
     setReportingChat(null);
     setShowGroupManagement(false);
     setShowGroupInvitations(false);
@@ -779,6 +782,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     );
   }
 
+  if (showDeviceManagement && profile) {
+    return (
+      <AnimatedSafeAreaView key="device-management" style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <DeviceManagementScreen onBack={() => setShowDeviceManagement(false)} />
+      </AnimatedSafeAreaView>
+    );
+  }
+
   if (showProfileEditor && profile) {
     return (
       <AnimatedSafeAreaView key="profile-editor" style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -1121,6 +1133,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                   : <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>Send link</Text>}
               </Pressable>
             </View>
+          ) : null}
+          {profile ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowDeviceManagement(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Your devices</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Review registered devices and revoke old sessions.</Text>
+              </View>
+              <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
+            </Pressable>
           ) : null}
           {profile ? (
             <Pressable accessibilityRole="button" onPress={() => setShowGroupInvitations(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>

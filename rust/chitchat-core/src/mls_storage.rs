@@ -68,7 +68,7 @@ impl Codec for ChitChatStorageCodec {
     type Error = StorageCodecError;
 
     fn to_vec<T: Serialize>(value: &T) -> Result<Vec<u8>, Self::Error> {
-        let mut plaintext = serde_json::to_vec(value)?;
+        let plaintext = Zeroizing::new(serde_json::to_vec(value)?);
         let key = Self::key_copy()?;
         let cipher = XChaCha20Poly1305::new_from_slice(&*key)
             .map_err(|_| StorageCodecError::EncryptionFailed)?;
@@ -83,8 +83,6 @@ impl Codec for ChitChatStorageCodec {
             XNonce::from_slice(&nonce),
             Payload { msg: &plaintext, aad: STORAGE_AAD },
         );
-        plaintext.zeroize();
-
         let mut ciphertext = encrypted.map_err(|_| StorageCodecError::EncryptionFailed)?;
         let mut record = Vec::with_capacity(NONCE_BYTES + ciphertext.len());
         record.extend_from_slice(&nonce);
@@ -101,14 +99,12 @@ impl Codec for ChitChatStorageCodec {
         let cipher = XChaCha20Poly1305::new_from_slice(&*key)
             .map_err(|_| StorageCodecError::DecryptionFailed)?;
         let (nonce, ciphertext) = record.split_at(NONCE_BYTES);
-        let mut plaintext = cipher.decrypt(
+        let plaintext = Zeroizing::new(cipher.decrypt(
             XNonce::from_slice(nonce),
             Payload { msg: ciphertext, aad: STORAGE_AAD },
-        ).map_err(|_| StorageCodecError::DecryptionFailed)?;
+        ).map_err(|_| StorageCodecError::DecryptionFailed)?);
 
-        let decoded = serde_json::from_slice(&plaintext);
-        plaintext.zeroize();
-        decoded.map_err(StorageCodecError::Serialization)
+        serde_json::from_slice(&plaintext).map_err(StorageCodecError::Serialization)
     }
 }
 
