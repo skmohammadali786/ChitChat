@@ -9,7 +9,7 @@ function response(body, status, request) {
     "cache-control": "no-store",
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
+    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope, x-chitchat-object-id",
     "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope, x-chitchat-media-kind",
     "vary": "Origin",
   });
@@ -104,7 +104,9 @@ async function upload(request, env, user, conversationId, mediaKind) {
     return response({ error: "You are not a member of this conversation." }, 403, request);
   }
 
-  const id = crypto.randomUUID();
+  const suppliedId = request.headers.get("x-chitchat-object-id") || "";
+  const id = suppliedId || crypto.randomUUID();
+  if (!UUID_RE.test(id)) return response({ error: "A valid media object ID is required." }, 400, request);
   const objectKey = mediaKind === "avatar"
     ? `avatars/${user.id}/${id}.bin`
     : `conversations/${conversationId}/${user.id}/${id}.bin`;
