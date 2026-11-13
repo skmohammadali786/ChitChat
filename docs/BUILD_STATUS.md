@@ -70,3 +70,12 @@ cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by-feature inventory and implementation order.
+
+
+## Additional changes on the feature branch
+
+- System/light/dark appearance selection and six accent palette choices now persist locally and for signed-in users.
+- A scheduled-message manager allows users to list and cancel pending entries. Scheduling new messages remains disabled until MLS encryption is implemented.
+- Direct-account and group report actions call a private membership-checked RPC with reason validation and a five-per-hour rate limit. A reviewer console and moderation workflow are not implemented.
+- The message, scheduled-message and media service methods now independently enforce the fail-closed crypto gate, not just the UI.
+- Reporting migrations are recorded as `20261113030813_add_conversation_reporting` and `20261113031015_index_message_reports_target_user`. Security and health advisors returned no lints after these changes.
