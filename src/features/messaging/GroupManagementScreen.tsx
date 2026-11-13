@@ -194,26 +194,28 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
                     <Text style={styles.memberName}>{name}{self ? " (you)" : ""}</Text>
                     <Text style={styles.memberUsername}>{member.username ? `@${member.username} · ` : ""}{member.member_role}</Text>
                   </View>
-                  {currentMember?.member_role === "owner" && !self && member.member_role !== "owner" ? (
-                    <>
-                      <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRoleChange(member)} style={styles.memberAction}>
-                        <Text style={styles.transferText}>{member.member_role === "admin" ? "Remove admin" : "Make admin"}</Text>
+                  <View style={styles.memberActions}>
+                    {currentMember?.member_role === "owner" && !self && member.member_role !== "owner" ? (
+                      <>
+                        <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRoleChange(member)} style={styles.memberAction}>
+                          <Text style={styles.transferText}>{member.member_role === "admin" ? "Remove admin" : "Make admin"}</Text>
+                        </Pressable>
+                        <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmTransfer(member)} style={styles.memberAction}>
+                          <Text style={styles.transferText}>Make owner</Text>
+                        </Pressable>
+                      </>
+                    ) : null}
+                    {self && member.member_role === "owner" && members.length > 1 ? (
+                      <View style={styles.memberAction}>
+                        <Text style={styles.transferText}>Transfer first</Text>
+                      </View>
+                    ) : null}
+                    {canRemove ? (
+                      <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRemove(member)} style={styles.memberAction}>
+                        <Text style={styles.removeText}>{self ? "Leave" : "Remove"}</Text>
                       </Pressable>
-                      <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmTransfer(member)} style={styles.memberAction}>
-                        <Text style={styles.transferText}>Make owner</Text>
-                      </Pressable>
-                    </>
-                  ) : null}
-                  {self && member.member_role === "owner" && members.length > 1 ? (
-                    <View style={styles.memberAction}>
-                      <Text style={styles.transferText}>Transfer first</Text>
-                    </View>
-                  ) : null}
-                  {canRemove ? (
-                    <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRemove(member)} style={styles.memberAction}>
-                      <Text style={styles.removeText}>{self ? "Leave" : "Remove"}</Text>
-                    </Pressable>
-                  ) : null}
+                    ) : null}
+                  </View>
                 </View>
               );
             })}
@@ -244,10 +246,11 @@ const styles = StyleSheet.create({
   smallButtonText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
   disabled: { opacity: 0.55 },
   memberCard: { backgroundColor: palette.white, borderWidth: 1, borderColor: palette.line, borderRadius: radius.lg, paddingHorizontal: 12 },
-  memberRow: { minHeight: 66, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: palette.line },
+  memberRow: { minHeight: 66, flexDirection: "row", alignItems: "center", flexWrap: "wrap", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: palette.line },
   memberName: { color: palette.ink, fontSize: 12, fontWeight: "800" },
   memberUsername: { color: palette.muted, fontSize: 10, marginTop: 3 },
-  memberAction: { paddingHorizontal: 7, paddingVertical: 9 },
+  memberActions: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: 8, paddingLeft: 52, marginTop: 6 },
+  memberAction: { minHeight: 32, paddingHorizontal: 8, paddingVertical: 7, justifyContent: "center", borderRadius: radius.sm, backgroundColor: "#F4F1FF" },
   removeText: { color: "#B42318", fontSize: 10, fontWeight: "800" },
   transferText: { color: palette.brand, fontSize: 10, fontWeight: "800" },
   error: { color: "#B42318", fontSize: 12, lineHeight: 18, marginTop: 14 },
