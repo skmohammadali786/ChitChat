@@ -187,7 +187,7 @@ async function processPendingCommits(conversationId: string, deviceId: string, g
  * Bring this device up to the server-authorized MLS epoch.
  * The server never sees private keys or decrypted message content.
  */
-export async function syncConversationMlsGroup(conversationId: string): Promise<{ groupId: string; epoch: number; joined: number; commits: number; addedDevices: number }> {
+async function syncConversationMlsGroupInternal(conversationId: string): Promise<{ groupId: string; epoch: number; joined: number; commits: number; addedDevices: number }> {
   if (!conversationId) throw new Error("A conversation is required.");
   const user = await currentUser();
   const device = await publishMyMlsDevice();
@@ -243,6 +243,19 @@ export async function syncConversationMlsGroup(conversationId: string): Promise<
     throw new Error("This device has not applied all required MLS membership Commit messages yet.");
   }
   return { groupId: group.groupId, epoch, joined, commits, addedDevices };
+}
+
+const conversationSyncs = new Map<string, Promise<{ groupId: string; epoch: number; joined: number; commits: number; addedDevices: number }>>();
+export async function syncConversationMlsGroup(conversationId: string): Promise<{ groupId: string; epoch: number; joined: number; commits: number; addedDevices: number }> {
+  const inFlight = conversationSyncs.get(conversationId);
+  if (inFlight) return inFlight;
+  const task = syncConversationMlsGroupInternal(conversationId);
+  conversationSyncs.set(conversationId, task);
+  try {
+    return await task;
+  } finally {
+    if (conversationSyncs.get(conversationId) === task) conversationSyncs.delete(conversationId);
+  }
 }
 
 export async function sendMlsTextMessage(conversationId: string, text: string, options: { expiresAt?: string | null; concealed?: boolean } = {}) {
@@ -342,14 +355,24 @@ export async function sendMlsMediaMessage(
 
 export async function decryptMlsMessage(record: EncryptedMessageRecord): Promise<MessageContent> {
   const header = record.crypto_header as Record<string, unknown>;
-  if (header.protocol !== "mls" || header.content_type !== "application" || typeof header.group_id !== "string") {
-    throw new Error("Unsupported MLS message envelope.");
+  if (header.protocol !== "mls" || header.content_type !== "application" || typeof header.group_id !== "string"
+      || header.sender_id !== record.sender_id || header.message_type !== record.message_type
+      || typeof header.sender_device_id !== "string") {
+    throw new Error("Unsupported or mismatched MLS message envelope.");
+  }
+  const user = await currentUser();
+  const localDeviceId = await chitchatCore.getCurrentDeviceId();
+  if (record.sender_id === user.id && header.sender_device_id === localDeviceId) {
+    // Never feed an already-authored local message back into OpenMLS. The
+    // protected cache is written before the ciphertext leaves this device.
+    const cached = await chitchatCore.getLocalMessageContent(record.client_message_id);
+    const cachedContent = cached as MessageContent;
+    validateMessageContentShape(cachedContent);
+    return cachedContent;
   }
   const processed = await chitchatCore.processMessage(header.group_id, record.ciphertext);
   let contentValue: unknown = processed.content;
-  if (processed.kind === "own_echo") {
-    // OpenMLS intentionally does not return plaintext for a message authored
-    // by this local leaf. Read it only from the encrypted native cache.
+  if (processed.kind === "own_echo" && record.sender_id === user.id && header.sender_device_id === localDeviceId) {
     contentValue = await chitchatCore.getLocalMessageContent(record.client_message_id);
   }
   if ((processed.kind !== "application" && processed.kind !== "own_echo")
