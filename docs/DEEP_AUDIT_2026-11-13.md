@@ -79,7 +79,7 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 
 ### Privacy, safety, account controls
 - Block/unblock: Partial. Backend and blocked-list UI exist. Server-side group discoverability, blocked direct-conversation filtering, direct-write block enforcement and push suppression are implemented; multi-user integration tests and group-specific semantics remain.
-- Report user/message: Partial. Direct-account and group report UI calls membership-checked private RPCs. Message reports validate sender identity. Both server paths validate reason/details and serialize a shared five-per-hour limit. Per-message UI, moderation console and triage remain missing.
+- Report user/message: Partial. Direct-account and group report UI now use a detailed form with seven categories and optional details. Private RPCs validate membership, reason and sender identity, enforce a 1,000-character limit and serialize a shared five-per-hour rate limit. Per-message report UI, moderation console and triage remain missing.
 - App lock/biometric unlock: Partial. Expo LocalAuthentication gates the signed-in app after backgrounding and prompts on resume; biometrics or device PIN/passcode fallback are supported. Physical Android/iOS testing remains.
 - Notification preview privacy: Partial. UI supports off and sender-only. The notification function never sends message plaintext. Device lock-screen behavior and real push delivery still need tests.
 - Read receipt/online/typing/last-seen controls: Partial. Preferences and presence service exist; UI semantics and cross-device enforcement require tests.
@@ -161,6 +161,11 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 - The scheduled-message manager remains useful for reading/cancelling any existing pending records. Creating new entries is intentionally disabled on the server until the MLS protocol is integrated.
 
 
-- Hardened the existing message-report RPC with supported-reason validation, a 2,000-character details limit, membership checks, rejection of self-reports and the shared five-per-hour reporter limit.
+- Hardened the existing message-report RPC with supported-reason validation, a 1,000-character details limit, membership checks, rejection of self-reports and the shared five-per-hour reporter limit.
 
 - Report throttling is serialized per reporter using a transaction-scoped advisory lock across both message and conversation report RPCs, preventing concurrent submissions from racing the five-per-hour threshold.
+
+
+- Added `ReportConversationModal` with seven report categories, optional 1,000-character context, busy/error states and a private submit flow from direct/group chat actions.
+- Corrected the moderation schema/RPC mismatch. The live `private.message_reports` table now accepts exactly the reason values supported by the private RPCs and caps details at 1,000 characters. The client mirrors that limit.
+- App lock now tracks React Native `AppState` and invokes the OS authentication prompt when the app returns to active state. Real-device tests still remain.
