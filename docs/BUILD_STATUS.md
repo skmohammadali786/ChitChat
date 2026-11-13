@@ -117,3 +117,13 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 
 ## Latest follow-up
 - Outgoing typing broadcasts are now wired to the real-conversation composer and stop on inactivity, send, blur, or route cleanup. This is source-level implementation only; multi-account Realtime/device verification is still required.
+
+
+## Latest implementation follow-up
+
+- Cloudflare `chitchat-media-api` was updated from the feature branch source. The deployed Worker now carries the encrypted media key envelope through upload/download and enforces 50 MB message media and 8 MB avatar limits. The matching Supabase avatar-size constraint is installed. External unauthenticated smoke requests could not be completed from the current network environment.
+- Authenticated `notify-call` and `notify-group-invitation` push functions are deployed with privacy, mute and block checks and notification routing. Real EAS push delivery remains untested.
+- Authenticated `get-call-ice-servers` Edge Function is deployed. It issues short-lived coturn REST HMAC credentials only to participants of active calls. Configure `TURN_URLS` and `TURN_SHARED_SECRET` in Supabase Edge Function secrets before relay credentials can be issued. No TURN server is provisioned by this repository.
+- Device trust is invalidated when a key bundle changes or a device is revoked. Device revocation uses a server RPC; clients cannot directly update registered device key fields. Security advisor reports no current security lints.
+- The encrypted offline outbox now persists exponential retry backoff, stops after eight transient attempts, and marks permanent failures for explicit retry.
+- These changes do not unlock the message composer or calls media. The OpenMLS Rust test engine remains test-only, the Android/iOS native bridge is missing, and WebRTC media is not linked. No Android/iOS build or physical-device test has passed.

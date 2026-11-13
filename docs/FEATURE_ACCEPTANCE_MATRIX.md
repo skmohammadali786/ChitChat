@@ -67,7 +67,7 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Offline outbox | PARTIAL | Bounded per-account ciphertext-only queue, idempotent FIFO retry helper, app-foreground retry and Expo network-reconnection retry hooks exist; real composer integration and device tests remain |
+| Offline outbox | PARTIAL | Bounded per-account ciphertext-only queue, idempotent FIFO retry, app-foreground/reconnection hooks, persisted exponential backoff, eight-attempt limit and explicit failed-item retry exist; real composer integration and device tests remain |
 | Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
 | Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
 | Push notifications | PARTIAL | Expo token registration, authenticated generic message, incoming-call and group-invitation delivery, mute/opt-out/block enforcement and message/call/group-invitation routing exist; EAS credentials and real-device delivery/retry tests remain |
