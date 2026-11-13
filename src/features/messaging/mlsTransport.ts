@@ -252,12 +252,13 @@ export async function sendMlsContent(conversationId: string, content: MessageCon
   validateMessageContentShape(content);
   const user = await currentUser();
   const group = await syncConversationMlsGroup(conversationId);
-  const ciphertext = await chitchatCore.encryptContent(group.groupId, content);
+  const clientMessageId = createUuid();
+  const ciphertext = await chitchatCore.encryptContentForMessage(group.groupId, clientMessageId, content);
   const epoch = await chitchatCore.currentEpoch(group.groupId);
   const deviceId = await chitchatCore.getCurrentDeviceId();
   if (epoch !== group.epoch) throw new Error("The MLS group changed while composing this message. Retry after synchronization.");
   return sendEncryptedMessage(conversationId, {
-    client_message_id: createUuid(),
+    client_message_id: clientMessageId,
     message_type: "text",
     ciphertext,
     nonce: "mls-rfc9420",
@@ -289,11 +290,13 @@ export async function sendMlsMediaMessage(
   if (!conversationId || !picked?.uri) throw new Error("Choose a file and conversation first.");
   const user = await currentUser();
   const group = await syncConversationMlsGroup(conversationId);
+  const clientMessageId = createUuid();
   const encrypted = await chitchatCore.encryptMediaFile(
     picked.uri,
     group.groupId,
     picked.kind as MediaKind,
     options.concealed ?? false,
+    clientMessageId,
   );
   if (!encrypted.object_id || encrypted.media_kind !== picked.kind || !encrypted.content_message_base64) {
     throw new Error("The native media encryptor returned incomplete MLS metadata.");
@@ -310,7 +313,7 @@ export async function sendMlsMediaMessage(
     const deviceId = await chitchatCore.getCurrentDeviceId();
     if (epoch !== group.epoch) throw new Error("The MLS group changed during media upload. Retry after synchronization.");
     return await sendEncryptedMessage(conversationId, {
-      client_message_id: createUuid(),
+      client_message_id: clientMessageId,
       message_type: picked.kind,
       ciphertext: encrypted.content_message_base64,
       nonce: "mls-rfc9420",
@@ -343,10 +346,17 @@ export async function decryptMlsMessage(record: EncryptedMessageRecord): Promise
     throw new Error("Unsupported MLS message envelope.");
   }
   const processed = await chitchatCore.processMessage(header.group_id, record.ciphertext);
-  if (processed.kind !== "application" || !processed.content || typeof processed.content !== "object") {
+  let contentValue: unknown = processed.content;
+  if (processed.kind === "own_echo") {
+    // OpenMLS intentionally does not return plaintext for a message authored
+    // by this local leaf. Read it only from the encrypted native cache.
+    contentValue = await chitchatCore.getLocalMessageContent(record.client_message_id);
+  }
+  if ((processed.kind !== "application" && processed.kind !== "own_echo")
+      || !contentValue || typeof contentValue !== "object") {
     throw new Error("No authenticated MLS application content was returned.");
   }
-  const content = processed.content as MessageContent;
+  const content = contentValue as MessageContent;
   validateMessageContentShape(content);
   return content;
 }
