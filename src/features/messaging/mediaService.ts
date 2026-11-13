@@ -139,6 +139,18 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   return { bytes: await response.arrayBuffer(), sha256, cryptoVersion, keyEnvelope };
 }
 
+export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
+  if (!chitchatCore.mediaDecryptionAvailable) {
+    throw new Error("The protected Rust media decryptor is not linked in this build.");
+  }
+  const encrypted = await downloadEncryptedMedia(mediaId);
+  return chitchatCore.decryptMediaFile(mediaId, encodeBase64(encrypted.bytes), {
+    keyEnvelope: encrypted.keyEnvelope,
+    sha256: encrypted.sha256,
+    cryptoVersion: encrypted.cryptoVersion,
+  });
+}
+
 export async function deleteEncryptedMedia(mediaId: string): Promise<void> {
   if (!mediaId) throw new Error("A media ID is required.");
   const token = await sessionToken();

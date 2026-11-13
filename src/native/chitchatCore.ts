@@ -95,6 +95,13 @@ export const chitchatCore = {
   get mediaCryptoAvailable(): boolean {
     return Platform.OS !== "web"
       && typeof nativeCore?.encryptMediaFile === "function"
+      && typeof nativeCore?.decryptMediaFile === "function"
+      && typeof nativeCore?.isProtectedStorageReady === "function";
+  },
+
+  get mediaDecryptionAvailable(): boolean {
+    return Platform.OS !== "web"
+      && typeof nativeCore?.decryptMediaFile === "function"
       && typeof nativeCore?.isProtectedStorageReady === "function";
   },
 
@@ -133,9 +140,30 @@ export const chitchatCore = {
     if (!mediaId || !chitchatCore.avatarCryptoAvailable || !nativeCore?.decryptAvatarFile) {
       throw new Error("The protected Rust avatar decryptor is not linked in this build.");
     }
+    if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
+      throw new Error("Protected device storage is locked. The avatar was not decrypted.");
+    }
     const uri = await nativeCore.decryptAvatarFile(mediaId, ciphertextBase64, JSON.stringify(metadata));
     if (typeof uri !== "string" || !uri.startsWith("file://")) {
       throw new Error("The native avatar decryptor did not return a private local file URI.");
+    }
+    return uri;
+  },
+
+  async decryptMediaFile(
+    mediaId: string,
+    ciphertextBase64: string,
+    metadata: { keyEnvelope: string; sha256: string; cryptoVersion: number },
+  ): Promise<string> {
+    if (!mediaId || !chitchatCore.mediaDecryptionAvailable || !nativeCore?.decryptMediaFile) {
+      throw new Error("The protected Rust media decryptor is not linked in this build.");
+    }
+    if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
+      throw new Error("Protected MLS storage is locked. Media was not decrypted.");
+    }
+    const uri = await nativeCore.decryptMediaFile(mediaId, ciphertextBase64, JSON.stringify(metadata));
+    if (typeof uri !== "string" || !uri.startsWith("file://")) {
+      throw new Error("The native media decryptor did not return a private local file URI.");
     }
     return uri;
   },

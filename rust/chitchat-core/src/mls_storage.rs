@@ -169,6 +169,7 @@ mod tests {
 
     #[test]
     fn codec_encrypts_each_record_and_round_trips_after_key_installation() {
+        let _guard = MLS_TEST_LOCK.lock().unwrap();
         clear_mls_storage_key().unwrap();
         install_mls_storage_key(&[0x42; KEY_BYTES]).unwrap();
         let value = TestRecord { group_epoch: 17, local_secret: "MLS epoch secret".into() };

@@ -27,7 +27,7 @@ type Props = {
 
 function statusLabel(call: CallSession, userId: string | null): string {
   if (call.status === "ringing") return call.callee_id === userId ? "Incoming call" : "Calling";
-  if (call.status === "accepted") return "Connected at signaling level";
+  if (call.status === "accepted") return "Accepted, media connection unavailable";
   if (call.status === "missed") return "Missed";
   if (call.status === "rejected") return "Declined";
   if (call.status === "cancelled") return "Cancelled";
