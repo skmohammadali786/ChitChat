@@ -7,12 +7,14 @@
 
 mod message;
 mod media_crypto;
+mod device_identity;
 mod mls_storage;
 mod mls_engine;
 mod profile;
 mod result;
 
 pub use media_crypto::{decrypt_media, encrypt_media, EncryptedMedia};
+pub use device_identity::{generate_device_identity, verify_device_bundle, verify_device_challenge, DeviceIdentity, DevicePublicBundle, VerifiedDeviceFingerprint};
 pub use mls_storage::{
     ChitChatStorageCodec, StorageCodecError, clear_mls_storage_key,
     install_mls_storage_key, mls_storage_is_unlocked,

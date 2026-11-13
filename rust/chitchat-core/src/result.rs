@@ -54,4 +54,22 @@ pub enum CoreError {
     /// The ciphertext digest does not match the downloaded bytes.
     #[error("The encrypted media digest does not match the downloaded bytes.")]
     MediaDigestMismatch,
+        /// Random device key material could not be generated.
+    #[error("Device identity key generation failed.")]
+        DeviceKeyGenerationFailed,
+        /// The supplied public device key is malformed.
+    #[error("Device public key is invalid.")]
+        InvalidDevicePublicKey,
+        /// The signed-prekey or challenge signature does not verify.
+    #[error("Device signature is invalid.")]
+        InvalidDeviceSignature,
+        /// The advertised device fingerprint differs from its public keys.
+    #[error("Device fingerprint does not match the public keys.")]
+        DeviceFingerprintMismatch,
+        /// The device bundle uses a protocol version this client cannot verify.
+    #[error("The device key version is not supported.")]
+        UnsupportedDeviceKeyVersion,
+        /// The verification challenge is missing or has an invalid length.
+    #[error("Device verification challenge is invalid.")]
+        InvalidDeviceChallenge,
 }

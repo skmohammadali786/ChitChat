@@ -27,7 +27,7 @@ Legend:
 | Voice and video calls | NOT STARTED | Native WebRTC engine, microphone/camera permissions, authenticated call signaling, STUN/TURN configuration, incoming-call lifecycle, call controls and Android/iOS device tests |
 | End-to-end encryption | PARTIAL | OpenMLS 0.9.2 RustCrypto core and two-client application-message/key-rotation test are added; SQLite storage codec now encrypts each serialized record and fails closed without a Keystore/Keychain-injected key; durable native storage lifecycle, device credentials/key packages, Android/iOS bridge, cross-platform device vectors and independent review remain |
 | Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
-| Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
+| Device identity and verification | PARTIAL | Rust creates Ed25519 device identities, X25519 signed prekeys, user/device-bound signatures, challenge-response verification and stable fingerprints; Supabase device registry, QR/SAS exchange, protected private-key persistence and native Android/iOS bridge remain |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
 | Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion, expiring invitation inbox, accept/decline/revoke flows and server role enforcement are wired; OpenMLS group key rotation remains |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
