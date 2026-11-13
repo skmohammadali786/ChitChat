@@ -29,7 +29,7 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
 | Device identity and verification | PARTIAL | Rust creates Ed25519 device identities, X25519 signed prekeys, signed challenge-response and ten-digit fingerprints; Settings lists/revokes owned devices and conversation verification checks peer signatures; registration is gated on the native protected-storage capability; QR/SAS comparison, actual Keychain/Keystore implementation and physical tests remain |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion, expiring invitation inbox, accept/decline/revoke flows, live private invitation events for invitees/admins and server role enforcement are wired; OpenMLS group key rotation remains |
+| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion, expiring invitation inbox, accept/decline/revoke flows, private Realtime updates and generic background push invitations with inbox deep-link are wired; OpenMLS group key rotation remains |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | PARTIAL | Revealed secret text is non-selectable in the UI; sender-defined copy policy and platform-level capture limitations remain |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |

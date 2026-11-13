@@ -56,7 +56,7 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, openCallId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; openCallId?: string | null; onNotificationHandled?: () => void }) {
+function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, openCallId, openGroupInvitationId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; openCallId?: string | null; openGroupInvitationId?: string | null; onNotificationHandled?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [conversationListMode, setConversationListMode] = useState<"inbox" | "archived" | "hidden">("inbox");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -65,6 +65,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showGroupCreation, setShowGroupCreation] = useState(false);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showGroupInvitations, setShowGroupInvitations] = useState(false);
+  const [highlightedGroupInvitationId, setHighlightedGroupInvitationId] = useState<string | null>(null);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
   const [showDeviceManagement, setShowDeviceManagement] = useState(false);
@@ -494,6 +495,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   }, [profile?.id, activeChat?.conversationId, activeChat?.isReal, showOnlineStatus, showTypingStatus, showLastSeen]);
 
   useEffect(() => {
+    if (!openGroupInvitationId) return;
+    setHighlightedGroupInvitationId(openGroupInvitationId);
+    setShowGroupInvitations(true);
+    onNotificationHandled?.();
+  }, [openGroupInvitationId, onNotificationHandled]);
+
+  useEffect(() => {
     if (!openCallId) return;
     setHighlightedCallId(openCallId);
     setTab("Calls");
@@ -758,6 +766,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       <AnimatedSafeAreaView key="group-invitations" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <GroupInvitationsScreen
+          highlightInvitationId={highlightedGroupInvitationId}
           onBack={() => setShowGroupInvitations(false)}
           onAccepted={(conversationId, title) => {
             const initials = title.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
@@ -1452,12 +1461,15 @@ export default function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [notificationConversationId, setNotificationConversationId] = useState<string | null>(null);
   const [notificationCallId, setNotificationCallId] = useState<string | null>(null);
+  const [notificationGroupInvitationId, setNotificationGroupInvitationId] = useState<string | null>(null);
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (!lastNotificationResponse) return;
     const data = lastNotificationResponse.notification.request.content.data;
-    if (data?.type === "incoming_call" && typeof data.call_id === "string") {
+    if (data?.type === "group_invitation" && typeof data.invitation_id === "string") {
+      setNotificationGroupInvitationId(data.invitation_id);
+    } else if (data?.type === "incoming_call" && typeof data.call_id === "string") {
       setNotificationCallId(data.call_id);
     } else if (typeof data?.conversation_id === "string") {
       setNotificationConversationId(data.conversation_id);
@@ -1570,5 +1582,5 @@ export default function App() {
   if (!session?.user) return <ScreenTransition key="authentication"><AuthScreen onContinueDemo={() => setDemoMode(true)} /></ScreenTransition>;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ScreenTransition key="profile-setup"><ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} /></ScreenTransition>;
-  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} openCallId={notificationCallId} onNotificationHandled={() => { setNotificationConversationId(null); setNotificationCallId(null); }} />
+  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} openCallId={notificationCallId} openGroupInvitationId={notificationGroupInvitationId} onNotificationHandled={() => { setNotificationConversationId(null); setNotificationCallId(null); setNotificationGroupInvitationId(null); }} />
 }

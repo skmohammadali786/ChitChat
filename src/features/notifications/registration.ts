@@ -34,6 +34,13 @@ async function configureAndroidNotificationChannels(): Promise<void> {
     sound: "default",
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
   });
+  await Notifications.setNotificationChannelAsync("groups", {
+    name: "Group invitations",
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 180, 100, 180],
+    lightColor: "#7665D8",
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
 }
 
 export async function enablePushNotifications(): Promise<string> {

@@ -102,7 +102,16 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
     await run(async () => {
       const profile = await lookupProfileByUsername(username);
       if (!profile) throw new Error("No discoverable account found.");
-      await sendGroupInvitation(conversationId, profile.id);
+      const invitationId = await sendGroupInvitation(conversationId, profile.id);
+      void supabase?.functions.invoke("notify-group-invitation", {
+        body: { invitation_id: invitationId },
+      }).then(({ error: notificationError }) => {
+        if (notificationError) {
+          console.warn("ChitChat group invitation notification failed.", notificationError.message);
+        }
+      }).catch(error => {
+        console.warn("ChitChat group invitation notification request failed.", error);
+      });
       setNewUsername("");
       setNotice(`Invitation sent to @${profile.username}.`);
     });

@@ -16,9 +16,10 @@ import {
 type Props = {
   onBack: () => void;
   onAccepted: (conversationId: string, title: string) => void;
+  highlightInvitationId?: string | null;
 };
 
-export function GroupInvitationsScreen({ onBack, onAccepted }: Props) {
+export function GroupInvitationsScreen({ onBack, onAccepted, highlightInvitationId = null }: Props) {
   const [items, setItems] = useState<MyGroupInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export function GroupInvitationsScreen({ onBack, onAccepted }: Props) {
             const initials = title.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "GR";
             const busy = busyId === item.invitation_id;
             return (
-              <View key={item.invitation_id} style={styles.card}>
+              <View key={item.invitation_id} style={[styles.card, item.invitation_id === highlightInvitationId && styles.highlighted]}>
                 <View style={styles.cardTop}>
                   <Avatar initials={initials} color="#D8D1FF" size={48} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
@@ -147,6 +148,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: palette.ink, fontSize: 16, fontWeight: "800", textAlign: "center" },
   emptyText: { color: palette.muted, fontSize: 12, marginTop: 7, textAlign: "center" },
   card: { backgroundColor: palette.white, borderRadius: radius.lg, borderWidth: 1, borderColor: palette.line, padding: spacing.lg },
+  highlighted: { borderColor: palette.brand, borderWidth: 2 },
   cardTop: { flexDirection: "row", alignItems: "center" },
   groupName: { color: palette.ink, fontSize: 14, fontWeight: "800" },
   inviter: { color: palette.inkSoft, fontSize: 11, marginTop: 5 },
