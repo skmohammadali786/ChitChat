@@ -177,7 +177,7 @@ async function download(request, env, user, id) {
     "etag": object.httpEtag,
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256",
+    "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
     "vary": "Origin",
   });
   return new Response(object.body, { status: 200, headers });
@@ -199,7 +199,7 @@ export default {
       headers: {
         "access-control-allow-origin": request.headers.get("origin") || "*",
         "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-        "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256",
+        "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
         "access-control-max-age": "86400",
         "vary": "Origin",
       },
