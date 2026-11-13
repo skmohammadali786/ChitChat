@@ -162,3 +162,5 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 
 
 - Hardened the existing message-report RPC with supported-reason validation, a 2,000-character details limit, membership checks, rejection of self-reports and the shared five-per-hour reporter limit.
+
+- Report throttling is serialized per reporter using a transaction-scoped advisory lock across both message and conversation report RPCs, preventing concurrent submissions from racing the five-per-hour threshold.
