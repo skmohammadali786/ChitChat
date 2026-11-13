@@ -94,6 +94,14 @@ public final class ChitChatCoreModule: Module {
       try self.requireBridge().joinGroup(welcomeBase64: welcomeBase64)
     }
 
+    AsyncFunction("encryptContentForMessage") { (groupId: String, messageId: String, contentJson: String) throws -> String in
+      try self.requireBridge().encryptContentForMessage(groupId: groupId, messageId: messageId, contentJson: contentJson)
+    }
+
+    AsyncFunction("getLocalMessageContent") { (messageId: String) throws -> String in
+      try self.requireBridge().getLocalMessageContent(messageId: messageId)
+    }
+
     AsyncFunction("encryptContent") { (groupId: String, contentJson: String) throws -> String in
       try self.requireBridge().encryptContent(groupId: groupId, contentJson: contentJson)
     }
@@ -119,7 +127,7 @@ public final class ChitChatCoreModule: Module {
     }
 
     AsyncFunction("encryptMediaFile") {
-      (uri: String, groupId: String, mediaKind: String, concealed: Bool) throws -> String in
+      (uri: String, groupId: String, mediaKind: String, concealed: Bool, messageId: String) throws -> String in
       guard let fileURL = URL(string: uri), fileURL.isFileURL else {
         throw NSError(domain: "ChitChatMedia", code: 2, userInfo: [
           NSLocalizedDescriptionKey: "A local iOS file URI is required.",
@@ -141,6 +149,7 @@ public final class ChitChatCoreModule: Module {
       try self.requireBridge().encryptMediaAndWrap(
         groupId: groupId,
         objectId: UUID().uuidString.lowercased(),
+        messageId: messageId,
         plaintext: Array(plaintext),
         mediaKind: mediaKind,
         concealed: concealed
