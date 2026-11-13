@@ -103,3 +103,11 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - The live database has no authenticated INSERT grants for either table. Existing scheduled rows can still be read and cancelled. The secure composer remains disabled.
 
 - Report throttling now takes a per-reporter transaction-scoped advisory lock and applies across both message and conversation submissions.
+
+
+## Report form and consistency
+
+- Added a detailed report form from direct and group chat actions. It supports seven categories and optional context up to 1,000 characters.
+- The private table constraints and both reporting RPCs now agree on accepted reasons and the 1,000-character details limit.
+- Report submissions are serialized per reporter across message and conversation report RPCs.
+- App lock triggers the native authentication prompt on foreground resume; device validation remains pending.
