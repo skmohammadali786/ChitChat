@@ -128,7 +128,7 @@ export function CallsScreen({ userId, conversations, highlightCallId = null }: P
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.info}>
           <Text style={styles.infoTitle}>Media engine not linked</Text>
-          <Text style={styles.infoCopy}>Authenticated call sessions and private signaling are available. Microphone, camera, WebRTC peer connections, and TURN relay are not linked in this native build. Calls cannot connect until that engine is installed and tested.</Text>
+          <Text style={styles.infoCopy}>Authenticated call sessions, private signaling, and a short-lived TURN credential endpoint are available. The coturn server secrets are not configured, and the native WebRTC microphone, camera, and peer-connection runtime is not linked. Calls cannot connect until both are configured and tested.</Text>
           <Text style={styles.statusMeta}>Realtime inbox: {realtimeStatus}</Text>
         </View>
 

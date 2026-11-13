@@ -127,3 +127,8 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - Device trust is invalidated when a key bundle changes or a device is revoked. Device revocation uses a server RPC; clients cannot directly update registered device key fields. Security advisor reports no current security lints.
 - The encrypted offline outbox now persists exponential retry backoff, stops after eight transient attempts, and marks permanent failures for explicit retry.
 - These changes do not unlock the message composer or calls media. The OpenMLS Rust test engine remains test-only, the Android/iOS native bridge is missing, and WebRTC media is not linked. No Android/iOS build or physical-device test has passed.
+
+
+## Call lifecycle verification
+
+Accepted call sessions now replace the 45-second ringing deadline with a four-hour maximum session lifetime. The minute-level cleanup job expires both unanswered ringing requests and abandoned accepted sessions. New call creation also expires a stale session synchronously before checking the one-active-call constraint. The TURN credential endpoint therefore receives the active session expiry rather than the expired ringing deadline.
