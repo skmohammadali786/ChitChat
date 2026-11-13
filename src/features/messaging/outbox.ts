@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabase";
 
 const storage = createAsyncStorage("chitchat-encrypted-outbox-v1");
 const MAX_ITEMS = 200;
-const MAX_SERIALIZED_BYTES = 5 * 1024 * 1024;
+const MAX_SERIALIZED_CHARS = 5 * 1024 * 1024;
 
 export type PendingEncryptedMessage = {
   conversationId: string;
@@ -79,7 +79,7 @@ async function readForUser(userId: string): Promise<PendingEncryptedMessage[]> {
 async function writeForUser(userId: string, items: PendingEncryptedMessage[]): Promise<void> {
   if (items.length > MAX_ITEMS) throw new Error("The offline message queue is full. Connect to the internet and retry.");
   const serialized = JSON.stringify(items);
-  if (new TextEncoder().encode(serialized).byteLength > MAX_SERIALIZED_BYTES) {
+  if (serialized.length > MAX_SERIALIZED_CHARS) {
     throw new Error("The offline message queue reached its storage limit. Retry when online.");
   }
   await storage.setItem(storageKey(userId), serialized);

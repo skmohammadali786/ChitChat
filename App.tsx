@@ -23,6 +23,8 @@ import { ReportConversationModal } from "./src/features/messaging/ReportConversa
 import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
+import { flushPendingEncryptedMessages } from "./src/features/messaging/delivery";
+import { listPendingEncryptedMessages } from "./src/features/messaging/outbox";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
 import { isSupabaseConfigured, supabase, type ChitChatProfile } from "./src/lib/supabase";
 import { loadPreferences, savePreference, type AccentPalette } from "./src/lib/preferences";
@@ -218,6 +220,28 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       const rightPinned = right.pinnedAt ? Date.parse(right.pinnedAt) : 0;
       return rightPinned - leftPinned;
     }), [chats, search, conversationListMode]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    const retryOutbox = async () => {
+      try {
+        const pending = await listPendingEncryptedMessages();
+        if (pending.length) await flushPendingEncryptedMessages();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/secure messaging is not ready|protocol adapter is not enabled/i.test(message)) {
+          console.warn("ChitChat could not retry pending encrypted messages.", message);
+        }
+      }
+    };
+
+    void retryOutbox();
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") void retryOutbox();
+    });
+    return () => subscription.remove();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!profile || !supabase) {
