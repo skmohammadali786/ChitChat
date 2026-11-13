@@ -9,11 +9,19 @@ async function currentUser(){const {data,error}=await client().auth.getUser();if
 
 export async function publishMyMlsDevice():Promise<{deviceId:string;bundle:DevicePublicBundle;keyPackage:string}>{
  const user=await currentUser();await chitchatCore.openProtectedStorage();const bundle=await chitchatCore.createDeviceIdentity(user.id);
- const {error}=await client().from("devices").upsert({id:bundle.device_id,user_id:user.id,device_label:"ChitChat device",platform:"react-native",identity_key_public:bundle.identity_key_public,signed_prekey_public:bundle.signed_prekey_public,signed_prekey_signature:bundle.signed_prekey_signature,key_version:bundle.key_version,fingerprint:bundle.fingerprint,last_seen_at:new Date().toISOString(),revoked_at:null},{onConflict:"id"});
- if(error)throw error;
  const keyPackage=await chitchatCore.generateKeyPackage(user.id+":"+bundle.device_id);
- const {error:packageError}=await client().from("mls_key_packages").upsert({device_id:bundle.device_id,user_id:user.id,key_package:keyPackage,key_version:1,expires_at:new Date(Date.now()+7*86400000).toISOString()},{onConflict:"device_id"});
- if(packageError)throw packageError;
+ const {error}=await client().rpc("publish_my_mls_device",{
+  p_device_id:bundle.device_id,
+  p_device_label:"ChitChat device",
+  p_platform:Platform.OS==="ios"?"ios":"android",
+  p_identity_key_public:bundle.identity_key_public,
+  p_signed_prekey_public:bundle.signed_prekey_public,
+  p_signed_prekey_signature:bundle.signed_prekey_signature,
+  p_fingerprint:bundle.fingerprint,
+  p_key_version:bundle.key_version,
+  p_key_package:keyPackage
+ });
+ if(error)throw error;
  return {deviceId:bundle.device_id,bundle,keyPackage};
 }
 
@@ -22,7 +30,13 @@ export async function createConversationMlsGroup(conversationId:string):Promise<
  const user=await currentUser();const device=await publishMyMlsDevice();
  const groupId=await chitchatCore.createGroup(user.id+":"+device.deviceId);
  const epoch=await chitchatCore.currentEpoch(groupId);
- const {error}=await client().from("conversation_mls_groups").upsert({conversation_id:conversationId,mls_group_id:groupId,ciphersuite:"MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",protocol_version:1,epoch,status:"active",created_by:user.id},{onConflict:"conversation_id"});
+ const {error}=await client().rpc("register_my_conversation_mls_group",{
+  p_conversation_id:conversationId,
+  p_mls_group_id:groupId,
+  p_device_id:device.deviceId,
+  p_ciphersuite:"MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+  p_epoch:epoch
+ });
  if(error)throw error;return groupId;
 }
 
@@ -38,7 +52,8 @@ export async function sendMlsTextMessage(conversationId:string,text:string,optio
 export async function sendMlsContent(conversationId:string,content:MessageContent,expiresAt:string|null=null):Promise<EncryptedMessageRecord>{
  validateMessageContentShape(content);const user=await currentUser();const group=await getConversationMlsGroup(conversationId);
  const ciphertext=await chitchatCore.encryptContent(group.groupId,content);const epoch=await chitchatCore.currentEpoch(group.groupId);
- return sendEncryptedMessage(conversationId,{client_message_id:createUuid(),message_type:"text",ciphertext,nonce:"mls-rfc9420",crypto_header:{protocol:"mls",protocol_version:1,ciphersuite:"MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",group_id:group.groupId,epoch:epoch||group.epoch,sender_id:user.id,content_type:"application"},key_version:1,expires_at:expiresAt});
+ const deviceId=await chitchatCore.getCurrentDeviceId();
+ return sendEncryptedMessage(conversationId,{client_message_id:createUuid(),message_type:"text",ciphertext,nonce:"mls-rfc9420",crypto_header:{protocol:"mls",protocol_version:1,ciphersuite:"MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",group_id:group.groupId,epoch,sender_id:user.id,sender_device_id:deviceId,content_type:"application"},key_version:1,expires_at:expiresAt});
 }
 export async function decryptMlsMessage(record:EncryptedMessageRecord):Promise<MessageContent>{
  const header=record.crypto_header as Record<string,unknown>;
