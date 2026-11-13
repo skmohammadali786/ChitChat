@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import { requireNativeModule } from "expo-modules-core";
-export type NativeEncryptedMedia={ciphertext_base64:string;key_envelope:string;sha256:string;crypto_version:number;media_kind?:"image"|"video"|"audio"|"file";object_id?:string};
+export type NativeEncryptedMedia={ciphertext_base64:string;key_envelope:string;content_message_base64:string;sha256:string;crypto_version:number;media_kind?:"image"|"video"|"audio"|"file";object_id:string};
 export type DevicePublicBundle={device_id:string;user_id:string;identity_key_public:string;signed_prekey_public:string;signed_prekey_signature:string;key_version:number;fingerprint:string};
 export type MlsProcessed={kind:"application"|"commit_merged"|"own_echo";epoch:number;content:unknown|null};
 export type MlsAddMemberResult={commit_base64:string;welcome_base64:string;epoch:number};
