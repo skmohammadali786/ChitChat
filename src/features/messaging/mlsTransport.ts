@@ -3,6 +3,8 @@ import { supabase } from "../../lib/supabase";
 import { chitchatCore, type DevicePublicBundle, type MlsAddMemberResult, type MlsProcessed } from "../../native/chitchatCore";
 import { createTextMessageContent, validateMessageContentShape, type MessageContent } from "./content";
 import { loadEncryptedMessages, sendEncryptedMessage, type EncryptedMessageRecord } from "./service";
+import { decodeBase64ToArrayBuffer, uploadEncryptedMedia, deleteEncryptedMedia, type MediaKind } from "./mediaService";
+import type { PickedMedia } from "./mediaPicker";
 
 type ConversationMlsGroup = { groupId: string; epoch: number; createdBy: string; status: string };
 type MissingMlsDevice = { target_device_id: string; target_user_id: string; key_package_id: string; key_package: string };
@@ -268,11 +270,73 @@ export async function sendMlsContent(conversationId: string, content: MessageCon
       sender_id: user.id,
       sender_device_id: deviceId,
       content_type: "application",
+      message_type: "text",
     },
     key_version: 1,
     expires_at: expiresAt,
   });
 }
+/**
+ * Encrypt a selected local file in the native Rust layer, upload only ciphertext
+ * to private R2, then publish the MLS ciphertext that contains the wrapped key.
+ * The media object is removed again if the message RPC fails.
+ */
+export async function sendMlsMediaMessage(
+  conversationId: string,
+  picked: PickedMedia,
+  options: { expiresAt?: string | null; concealed?: boolean } = {},
+): Promise<EncryptedMessageRecord> {
+  if (!conversationId || !picked?.uri) throw new Error("Choose a file and conversation first.");
+  const user = await currentUser();
+  const group = await syncConversationMlsGroup(conversationId);
+  const encrypted = await chitchatCore.encryptMediaFile(
+    picked.uri,
+    group.groupId,
+    picked.kind as MediaKind,
+    options.concealed ?? false,
+  );
+  if (!encrypted.object_id || encrypted.media_kind !== picked.kind || !encrypted.content_message_base64) {
+    throw new Error("The native media encryptor returned incomplete MLS metadata.");
+  }
+  const stored = await uploadEncryptedMedia(conversationId, picked.kind, {
+    bytes: decodeBase64ToArrayBuffer(encrypted.ciphertext_base64),
+    sha256: encrypted.sha256,
+    cryptoVersion: encrypted.crypto_version,
+    keyEnvelope: encrypted.key_envelope,
+    objectId: encrypted.object_id,
+  });
+  try {
+    const epoch = await chitchatCore.currentEpoch(group.groupId);
+    const deviceId = await chitchatCore.getCurrentDeviceId();
+    if (epoch !== group.epoch) throw new Error("The MLS group changed during media upload. Retry after synchronization.");
+    return await sendEncryptedMessage(conversationId, {
+      client_message_id: createUuid(),
+      message_type: picked.kind,
+      ciphertext: encrypted.content_message_base64,
+      nonce: "mls-rfc9420",
+      crypto_header: {
+        protocol: "mls",
+        protocol_version: 1,
+        ciphersuite: "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+        group_id: group.groupId,
+        epoch,
+        sender_id: user.id,
+        sender_device_id: deviceId,
+        content_type: "application",
+        message_type: picked.kind,
+        media_object_id: stored.id,
+      },
+      key_version: 1,
+      expires_at: options.expiresAt ?? null,
+    });
+  } catch (error) {
+    await deleteEncryptedMedia(stored.id).catch(cleanupError => {
+      console.warn("ChitChat could not remove an orphaned encrypted media object.", cleanupError);
+    });
+    throw error;
+  }
+}
+
 export async function decryptMlsMessage(record: EncryptedMessageRecord): Promise<MessageContent> {
   const header = record.crypto_header as Record<string, unknown>;
   if (header.protocol !== "mls" || header.content_type !== "application" || typeof header.group_id !== "string") {
