@@ -582,7 +582,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     </View>
   );
 
-  if (profile && (!securitySettingsReady || securitySettingsAccountId !== profile.id)) {
+  if ((profile && !securitySettingsReady) || securitySettingsAccountId !== (profile?.id ?? null)) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={accentColor} />
