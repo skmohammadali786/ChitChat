@@ -883,11 +883,21 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             )}
             ListEmptyComponent={
               <View style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 48 }}>
-                <Text style={{ color: c.text, fontSize: 15, fontWeight: "800" }}>{search ? "No matching conversations" : showArchivedConversations ? "No archived conversations" : "Your inbox is empty"}</Text>
-                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 }}>{showArchivedConversations ? "Conversations you archive will appear here. You can restore them at any time." : "Start with a username. ChitChat only returns profiles that allow discovery."}</Text>
-                <Pressable accessibilityRole="button" onPress={() => setShowNewChat(true)} style={{ backgroundColor: accentColor, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.md, marginTop: 16 }}>
-                  <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 12 }}>Find someone</Text>
-                </Pressable>
+                <Text style={{ color: c.text, fontSize: 15, fontWeight: "800" }}>
+                  {search ? "No matching conversations" : conversationListMode === "archived" ? "No archived conversations" : conversationListMode === "hidden" ? "No hidden conversations" : "Your inbox is empty"}
+                </Text>
+                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 }}>
+                  {conversationListMode === "archived"
+                    ? "Conversations you archive will appear here. You can move them back to your inbox."
+                    : conversationListMode === "hidden"
+                      ? "Hidden conversations stay out of your inbox until you restore them."
+                      : "Start with a username. ChitChat only returns profiles that allow discovery."}
+                </Text>
+                {conversationListMode === "inbox" ? (
+                  <Pressable accessibilityRole="button" onPress={() => setShowNewChat(true)} style={{ backgroundColor: accentColor, paddingHorizontal: 18, paddingVertical: 12, borderRadius: radius.md, marginTop: 16 }}>
+                    <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 12 }}>Find someone</Text>
+                  </Pressable>
+                ) : null}
                 {conversationLoadError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, textAlign: "center", marginTop: 12 }}>{conversationLoadError}</Text> : null}
               </View>
             }
