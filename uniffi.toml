@@ -1,0 +1,7 @@
+[bindings.kotlin]
+package_name = "uniffi.chitchat_core"
+cdylib_name = "chitchat_core"
+
+[bindings.swift]
+module_name = "ChitChatCoreFFI"
+ffi_module_name = "chitchat_coreFFI"

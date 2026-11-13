@@ -4,16 +4,39 @@
 //! this constructor. Rust keeps the key in zeroizing process memory and uses
 //! the authenticated encrypted SQLite codec for all OpenMLS state.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use openmls_sqlite_storage::Codec;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 use zeroize::Zeroize;
 
 use crate::{
-    clear_mls_storage_key, decrypt_media, encrypt_media, install_mls_storage_key,
-    validate_message_content, CoreError, MediaKind, MessageBlock, MessageContent, MlsRuntime,
+    clear_mls_storage_key,
+    decrypt_media,
+    device_identity::{
+        generate_device_identity, restore_device_identity, verify_device_bundle,
+        DeviceIdentity, DevicePublicBundle,
+    },
+    encrypt_media,
+    install_mls_storage_key,
+    mls_storage::ChitChatStorageCodec,
+    validate_envelope,
+    validate_message_content,
+    validate_profile,
+    CoreError,
+    EncryptedEnvelope,
+    MediaKind,
+    MessageBlock,
+    MessageContent,
+    MlsRuntime,
+    ProfileDraft,
 };
 
 /// Errors returned across the Android/iOS foreign-language boundary.
@@ -39,6 +62,15 @@ impl ChitChatBridgeError {
 #[derive(uniffi::Object)]
 pub struct ChitChatMlsBridge {
     runtime: Mutex<MlsRuntime>,
+    device_identity: Mutex<Option<DeviceIdentity>>,
+    device_identity_path: PathBuf,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ProtectedDeviceIdentityRecord {
+    user_id: Uuid,
+    device_id: Uuid,
+    private_material: Vec<u8>,
 }
 
 #[uniffi::export]
@@ -56,12 +88,31 @@ impl ChitChatMlsBridge {
 
         clear_mls_storage_key()
             .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
-        install_mls_storage_key(&storage_key)
-            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+        let install_result = install_mls_storage_key(&storage_key);
         storage_key.zeroize();
+        install_result.map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
 
-        let runtime = MlsRuntime::open(&database_path).map_err(ChitChatBridgeError::from_core)?;
-        Ok(Arc::new(Self { runtime: Mutex::new(runtime) }))
+        let runtime = match MlsRuntime::open(&database_path) {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                let _ = clear_mls_storage_key();
+                return Err(ChitChatBridgeError::from_core(error));
+            }
+        };
+        let device_identity_path = PathBuf::from(format!("{database_path}.device-identity.v1"));
+        let device_identity = match load_device_identity(&device_identity_path) {
+            Ok(identity) => identity,
+            Err(error) => {
+                let _ = clear_mls_storage_key();
+                return Err(error);
+            }
+        };
+
+        Ok(Arc::new(Self {
+            runtime: Mutex::new(runtime),
+            device_identity: Mutex::new(device_identity),
+            device_identity_path,
+        }))
     }
 
     /// Whether the protected OpenMLS runtime is currently unlocked.
@@ -72,7 +123,50 @@ impl ChitChatMlsBridge {
     /// Clear the in-memory database key. The native module should drop this
     /// object after calling lock, then reopen it after secure-store access.
     pub fn lock(&self) -> Result<(), ChitChatBridgeError> {
+        let mut identity = self.device_identity.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Device identity lock is unavailable."))?;
+        *identity = None;
         clear_mls_storage_key()
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))
+    }
+
+    /// Create or reload the device's long-term Ed25519 identity and signed
+    /// X25519 prekey. Private seeds are encrypted at rest with the same
+    /// Android Keystore/iOS Keychain-wrapped database key as OpenMLS state.
+    pub fn create_device_identity(
+        &self,
+        user_id: String,
+        device_id: String,
+    ) -> Result<String, ChitChatBridgeError> {
+        let user_id = Uuid::parse_str(&user_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The account ID is invalid."))?;
+        let device_id = Uuid::parse_str(&device_id)
+            .map_err(|_| ChitChatBridgeError::from_message("The device ID is invalid."))?;
+
+        let mut slot = self.device_identity.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Device identity lock is unavailable."))?;
+        if slot.as_ref().is_none_or(|identity| {
+            let bundle = identity.public_bundle();
+            bundle.user_id != user_id || bundle.device_id != device_id
+        }) {
+            let identity = generate_device_identity(user_id, device_id)
+                .map_err(ChitChatBridgeError::from_core)?;
+            persist_device_identity(&self.device_identity_path, user_id, device_id, &identity)?;
+            *slot = Some(identity);
+        }
+        let identity = slot.as_ref()
+            .ok_or_else(|| ChitChatBridgeError::from_message("Device identity is unavailable."))?;
+        serde_json::to_string(&identity.public_bundle())
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))
+    }
+
+    /// Verify a device identity bundle and calculate its ten-digit fingerprint.
+    pub fn verify_device_bundle(&self, payload: String) -> Result<String, ChitChatBridgeError> {
+        let bundle: DevicePublicBundle = serde_json::from_str(&payload)
+            .map_err(|_| ChitChatBridgeError::from_message("Device bundle payload is invalid."))?;
+        let verified = verify_device_bundle(&bundle)
+            .map_err(ChitChatBridgeError::from_core)?;
+        serde_json::to_string(&verified)
             .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))
     }
 
@@ -258,6 +352,71 @@ impl Drop for ChitChatMlsBridge {
     fn drop(&mut self) {
         let _ = clear_mls_storage_key();
     }
+}
+
+fn persist_device_identity(
+    path: &PathBuf,
+    user_id: Uuid,
+    device_id: Uuid,
+    identity: &DeviceIdentity,
+) -> Result<(), ChitChatBridgeError> {
+    let mut material = identity.private_material();
+    let mut record = ProtectedDeviceIdentityRecord {
+        user_id,
+        device_id,
+        private_material: material.to_vec(),
+    };
+    material.zeroize();
+
+    let encrypted = ChitChatStorageCodec::to_vec(&record)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    record.private_material.zeroize();
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    }
+    let temporary = path.with_extension("tmp");
+    fs::write(&temporary, encrypted)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    fs::rename(&temporary, path)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    Ok(())
+}
+
+fn load_device_identity(
+    path: &PathBuf,
+) -> Result<Option<DeviceIdentity>, ChitChatBridgeError> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let mut encrypted = fs::read(path)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    let mut record: ProtectedDeviceIdentityRecord = ChitChatStorageCodec::from_slice(&encrypted)
+        .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))?;
+    encrypted.zeroize();
+
+    let identity = restore_device_identity(
+        record.user_id,
+        record.device_id,
+        &record.private_material,
+    ).map_err(ChitChatBridgeError::from_core);
+    record.private_material.zeroize();
+    identity.map(Some)
+}
+
+#[uniffi::export]
+pub fn validate_profile_json(payload: String) -> Result<(), ChitChatBridgeError> {
+    let profile: ProfileDraft = serde_json::from_str(&payload)
+        .map_err(|_| ChitChatBridgeError::from_message("Profile payload is invalid."))?;
+    validate_profile(&profile).map_err(ChitChatBridgeError::from_core)
+}
+
+#[uniffi::export]
+pub fn validate_envelope_json(payload: String) -> Result<(), ChitChatBridgeError> {
+    let envelope: EncryptedEnvelope = serde_json::from_str(&payload)
+        .map_err(|_| ChitChatBridgeError::from_message("Encrypted envelope payload is invalid."))?;
+    validate_envelope(&envelope).map_err(ChitChatBridgeError::from_core)
 }
 
 fn decode_base64(value: &str) -> Result<Vec<u8>, ChitChatBridgeError> {

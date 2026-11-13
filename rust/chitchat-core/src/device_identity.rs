@@ -87,21 +87,50 @@ impl DeviceIdentity {
     }
 }
 
+impl DeviceIdentity {
+    /// Export the two 32-byte private seeds for immediate encryption by the
+    /// protected local storage codec. Callers must zeroize the returned copy.
+    pub(crate) fn private_material(&self) -> [u8; KEY_LEN * 2] {
+        let signing_seed = self.signing_key.to_bytes();
+        let prekey_seed = self.signed_prekey_secret.to_bytes();
+        let mut material = [0u8; KEY_LEN * 2];
+        material[..KEY_LEN].copy_from_slice(&signing_seed);
+        material[KEY_LEN..].copy_from_slice(&prekey_seed);
+        material
+    }
+}
+
 /// Create a new Ed25519 identity and X25519 signed prekey for this device.
 pub fn generate_device_identity(user_id: Uuid, device_id: Uuid) -> CoreResult<DeviceIdentity> {
-    let mut identity_seed = [0u8; KEY_LEN];
-    let mut prekey_seed = [0u8; KEY_LEN];
-    if getrandom::getrandom(&mut identity_seed).is_err()
-        || getrandom::getrandom(&mut prekey_seed).is_err()
-    {
-        identity_seed.zeroize();
-        prekey_seed.zeroize();
+    let mut material = [0u8; KEY_LEN * 2];
+    if getrandom::getrandom(&mut material).is_err() {
+        material.zeroize();
         return Err(CoreError::DeviceKeyGenerationFailed);
     }
+    let identity = restore_device_identity(user_id, device_id, &material);
+    material.zeroize();
+    identity
+}
 
-    let signing_key = SigningKey::from_bytes(&identity_seed);
+/// Restore a device identity from a secret record decrypted by the protected
+/// local storage codec. The caller must never persist the supplied bytes
+/// without encrypting them first.
+pub(crate) fn restore_device_identity(
+    user_id: Uuid,
+    device_id: Uuid,
+    material: &[u8],
+) -> CoreResult<DeviceIdentity> {
+    if material.len() != KEY_LEN * 2 {
+        return Err(CoreError::InvalidDeviceSecretMaterial);
+    }
+    let mut signing_seed = [0u8; KEY_LEN];
+    let mut prekey_seed = [0u8; KEY_LEN];
+    signing_seed.copy_from_slice(&material[..KEY_LEN]);
+    prekey_seed.copy_from_slice(&material[KEY_LEN..]);
+
+    let signing_key = SigningKey::from_bytes(&signing_seed);
     let signed_prekey_secret = StaticSecret::from(prekey_seed);
-    identity_seed.zeroize();
+    signing_seed.zeroize();
     prekey_seed.zeroize();
 
     let identity_public = signing_key.verifying_key().to_bytes();
