@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { assertSecureMessagingAvailable } from "./cryptoGate";
 
 const mediaApiUrl = process.env.EXPO_PUBLIC_MEDIA_API_URL?.trim().replace(/\/$/, "");
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
@@ -54,6 +55,7 @@ export async function uploadEncryptedMedia(
   mediaKind: MediaKind,
   payload: EncryptedMediaPayload,
 ): Promise<StoredMedia> {
+  assertSecureMessagingAvailable();
   if (!conversationId) throw new Error("A conversation is required.");
   if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_MEDIA_BYTES) {
     throw new Error("Encrypted media must be between 1 byte and 50 MB.");
@@ -83,6 +85,7 @@ export async function uploadEncryptedMedia(
 
 /** Upload an already encrypted avatar. The Worker updates profiles.avatar_path. */
 export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Promise<StoredMedia> {
+  assertSecureMessagingAvailable();
   if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_MEDIA_BYTES) {
     throw new Error("Encrypted avatar must be between 1 byte and 50 MB.");
   }
