@@ -76,7 +76,7 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 
 - System/light/dark appearance selection and six accent palette choices now persist locally and for signed-in users.
 - A scheduled-message manager allows users to list and cancel pending entries. Scheduling new messages remains disabled until MLS encryption is implemented.
-- Direct-account and group report actions call a private membership-checked RPC with reason validation and a five-per-hour rate limit. A reviewer console and moderation workflow are not implemented.
+- Direct-account and group report actions open a detailed form with seven categories and optional details up to 1,000 characters. Private RPCs check membership, enforce the database reason/details constraints and serialize five reports per hour per account. A reviewer console and moderation workflow are not implemented.
 - The message, scheduled-message and media service methods now independently enforce the fail-closed crypto gate, not just the UI.
 - Reporting migrations include conversation/account reporting, target-user indexing, message report validation and transaction-serialized five-per-hour throttling across both report endpoints. Security and health advisors returned no lints.
 
@@ -111,3 +111,5 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - The private table constraints and both reporting RPCs now agree on accepted reasons and the 1,000-character details limit.
 - Report submissions are serialized per reporter across message and conversation report RPCs.
 - App lock triggers the native authentication prompt on foreground resume; device validation remains pending.
+
+- Concealed demo text is non-selectable, re-hides when the app leaves the foreground, and hides when the user disables auto-reveal. This is not secure memory zeroization and does not prevent all screenshots or screen recordings.
