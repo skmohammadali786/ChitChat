@@ -4,13 +4,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { radius, spacing } from "../../theme/tokens";
 import { reportConversation, type ConversationReportReason } from "./reporting";
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { cancelScheduledMessage, loadScheduledMessages, type ScheduledMessage } from "./scheduledMessages";
 
