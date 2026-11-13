@@ -141,7 +141,7 @@ export async function uploadEncryptedMedia(
 }
 
 export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Promise<StoredMedia> {
-  if (!chitchatCore.avatarCryptoAvailable) {
+  if (!chitchatCore.avatarEncryptionAvailable) {
     throw new Error("The protected Rust avatar encryption module is not linked in this build.");
   }
   if (!payload.keyEnvelope || payload.keyEnvelope.length < 32 || payload.keyEnvelope.length > 8_192) {
@@ -207,8 +207,8 @@ export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
  * after the encrypted R2 object and Supabase metadata row are stored.
  */
 export async function encryptAndUploadAvatar(uri: string): Promise<StoredMedia> {
-  if (!uri || !chitchatCore.avatarCryptoAvailable) {
-    throw new Error("The protected Rust avatar encryption/decryption module is not linked in this build.");
+  if (!uri || !chitchatCore.avatarEncryptionAvailable) {
+    throw new Error("The protected Rust avatar encryption module is not linked in this build.");
   }
   const encrypted = await chitchatCore.encryptAvatarFile(uri);
   return uploadEncryptedAvatar({

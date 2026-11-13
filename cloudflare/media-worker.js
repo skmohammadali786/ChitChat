@@ -1,4 +1,5 @@
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -66,11 +67,16 @@ async function getMediaRow(env, token, id) {
 
 function limitedStream(body, maxBytes) {
   let received = 0;
+  const limitError = () => {
+    const error = new Error(`Upload exceeds the ${Math.floor(maxBytes / 1024 / 1024)} MB limit.`);
+    error.name = "UploadLimitError";
+    return error;
+  };
   const stream = body.pipeThrough(new TransformStream({
     transform(chunk, controller) {
       received += chunk.byteLength;
       if (received > maxBytes) {
-        controller.error(new Error("Media upload exceeds the 50 MB limit."));
+        controller.error(limitError());
         return;
       }
       controller.enqueue(chunk);
@@ -87,8 +93,12 @@ async function upload(request, env, user, conversationId, mediaKind) {
   const keyEnvelope = request.headers.get("x-chitchat-key-envelope") || "";
   if (keyEnvelope.length < 32 || keyEnvelope.length > 8_192 || !/^[A-Za-z0-9_+\\/=.-]+$/.test(keyEnvelope)) return response({ error: "A valid encrypted media key envelope is required." }, 400, request);
   if (!request.body) return response({ error: "The upload body is empty." }, 400, request);
+  const maxBytes = mediaKind === "avatar" ? MAX_AVATAR_BYTES : MAX_UPLOAD_BYTES;
+  const maxMegabytes = Math.floor(maxBytes / 1024 / 1024);
   const declaredLength = Number(request.headers.get("content-length") || "0");
-  if (declaredLength > MAX_UPLOAD_BYTES) return response({ error: "Media uploads are limited to 50 MB." }, 413, request);
+  if (declaredLength > maxBytes) {
+    return response({ error: `${mediaKind === "avatar" ? "Avatar" : "Media"} uploads are limited to ${maxMegabytes} MB.` }, 413, request);
+  }
   if (mediaKind !== "avatar" && !conversationId) return response({ error: "A conversation is required." }, 400, request);
   if (conversationId && !await isConversationMember(env, user.token, user.id, conversationId)) {
     return response({ error: "You are not a member of this conversation." }, 403, request);
@@ -98,7 +108,7 @@ async function upload(request, env, user, conversationId, mediaKind) {
   const objectKey = mediaKind === "avatar"
     ? `avatars/${user.id}/${id}.bin`
     : `conversations/${conversationId}/${user.id}/${id}.bin`;
-  const limited = limitedStream(request.body, MAX_UPLOAD_BYTES);
+  const limited = limitedStream(request.body, maxBytes);
   let stored = false;
   try {
     await env.MEDIA.put(objectKey, limited.stream, {
@@ -109,7 +119,7 @@ async function upload(request, env, user, conversationId, mediaKind) {
     });
     stored = true;
     const actualBytes = limited.getBytes();
-    if (actualBytes < 1 || actualBytes > MAX_UPLOAD_BYTES) throw new Error("Invalid media size.");
+    if (actualBytes < 1 || actualBytes > maxBytes) throw new Error(`Invalid ${mediaKind} size.`);
 
     const row = {
       id,
@@ -157,7 +167,12 @@ async function upload(request, env, user, conversationId, mediaKind) {
     }, 201, request);
   } catch (error) {
     if (stored) await env.MEDIA.delete(objectKey).catch(() => undefined);
-    return response({ error: error instanceof Error ? error.message : "Media upload failed." }, 500, request);
+    const limitExceeded = error instanceof Error && error.name === "UploadLimitError";
+    return response(
+      { error: error instanceof Error ? error.message : "Media upload failed." },
+      limitExceeded ? 413 : 500,
+      request,
+    );
   }
 }
 

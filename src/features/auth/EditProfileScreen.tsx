@@ -29,8 +29,8 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
 
   async function changeAvatar() {
     setError("");
-    if (!chitchatCore.avatarCryptoAvailable) {
-      setError("Encrypted avatars need the protected Rust and Keychain/Keystore module. This build will not upload an unencrypted photo.");
+    if (!chitchatCore.avatarEncryptionAvailable) {
+      setError("Encrypted avatars need the protected Rust and Keychain/Keystore encryption module. This build will not upload an unencrypted photo.");
       return;
     }
     if (!supabase) {
