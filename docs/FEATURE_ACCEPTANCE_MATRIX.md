@@ -22,8 +22,8 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Conversation list and history | PARTIAL | Real Supabase records, pagination, loading/empty/error states |
-| Real-time message delivery | PARTIAL | Encrypted inserts, realtime updates, reconnect and duplicate handling |
+| Conversation list and history | PARTIAL | Signed-in list loads real Supabase conversation records with account isolation and loading/empty/error states; message history rendering, pagination and decryption are not implemented |
+| Real-time message delivery | PARTIAL | Conversation realtime foundations exist, but authenticated client inserts are disabled until MLS protocol validation is implemented; history subscription/reconnect behavior remains unverified |
 | End-to-end encryption | NOT STARTED | Reviewed Olm/Double Ratchet or other selected protocol, key exchange, ratchet persistence and independent review |
 | Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
@@ -70,7 +70,7 @@ Legend:
 | Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
 | Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
 | Push notifications | PARTIAL | Expo token registration, authenticated generic sender-only delivery, mute/opt-out enforcement and notification tap routing exist; EAS credentials and real-device delivery/retry tests remain |
-| Scheduled messages | PARTIAL | Encrypted-envelope table and pg_cron dispatcher exist; signed-in users can review and cancel pending entries. New scheduling is correctly blocked until the MLS composer exists; delivery tests and schedule creation UI remain |
+| Scheduled messages | PARTIAL | Encrypted-envelope table and pg_cron dispatcher exist; signed-in users can review and cancel pending entries through a cancel-only RPC. Client INSERT and broad UPDATE are revoked until an MLS-aware composer and server acceptance checks exist |
 | Disappearing messages | NOT STARTED | Expiry policy, server cleanup and local cache handling |
 
 ## Privacy, safety and account controls
