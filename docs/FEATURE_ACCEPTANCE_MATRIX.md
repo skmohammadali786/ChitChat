@@ -30,7 +30,7 @@ Legend:
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
 | Groups | PARTIAL | Group create/manage UI and RPCs exist; server RPCs now enforce discoverability and block checks even when called outside the UI. Invitations and E2EE key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
-| Copy restrictions | NOT STARTED | Respect sender policy and platform limitations |
+| Copy restrictions | PARTIAL | Revealed secret text is non-selectable in the UI; sender-defined copy policy and platform-level capture limitations remain |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
 | Search | NOT STARTED | Local encrypted search index, no server-side plaintext indexing |
 | Pin, mute, archive, hide, delete | PARTIAL | Per-user pin/mute/archive/hide actions, separate inbox views and preference persistence exist; delete semantics and message-level cleanup remain |
@@ -42,9 +42,9 @@ Legend:
 |---|---|---|
 | Whole-message concealment | PARTIAL | Secret payload encrypted and stored with recipient reveal preference |
 | Concealed text sections | PARTIAL | Rust message-content model supports ordered Unicode text blocks and concealed flags; MLS encryption and reveal UI integration remain |
-| Automatic reveal | PARTIAL | Recipient-controlled setting, animation and reduced-motion behavior |
+| Automatic reveal | PARTIAL | Recipient setting, animation and reduced-motion behavior; disabling auto-reveal hides visible content and app backgrounding re-hides it |
 | Manual reveal | PARTIAL | Explicit tap and accessibility support |
-| Re-hide | PARTIAL | Hide decrypted UI and clear temporary buffers where technically possible |
+| Re-hide | PARTIAL | Manual hide, auto-rehide on app background and when auto-reveal is disabled; JavaScript string memory cannot be guaranteed to zeroize |
 | Secret photos/videos/audio/files | PARTIAL | Rust content model supports encrypted-media references and concealed attachments; file encryption, key wrapping, picker and decrypt path remain |
 | Screenshot/screen-recording claims | NOT STARTED | Document platform limitations; never promise impossible prevention |
 
@@ -78,7 +78,7 @@ Legend:
 | Feature | Status | Acceptance requirement |
 |---|---|---|
 | Block/unblock | PARTIAL | Block list and unblock UI exist; direct conversations are hidden, direct message inserts are rejected, group creation/add checks both directions, and push delivery excludes blocked relationships. Multi-user acceptance tests and group-specific block semantics remain |
-| Report message/user | PARTIAL | Direct-account and group report actions call private membership-checked RPCs; message reports validate that the sender is someone else; both use reason validation, a 1,000-character detail cap and a transaction-serialized five-per-hour account limit. Message-level UI, reviewer console and triage workflow remain |
+| Report message/user | PARTIAL | Direct-account and group report actions open a detailed form with seven reasons and optional 1,000-character context; private RPCs enforce membership and a transaction-serialized five-per-hour limit. Message-level UI, reviewer console and triage workflow remain |
 | App lock | PARTIAL | Native device-authentication lock screen is wired through Expo LocalAuthentication and locks when the app leaves the foreground; physical Android/iOS lifecycle and lockout testing remain |
 | Biometric unlock | PARTIAL | Uses the OS biometric prompt with device PIN/passcode fallback on Android/iOS; hardware enrollment and real-device failure/lockout testing remain |
 | Notification privacy | PARTIAL | User can disable alerts or show sender only; push payloads never include message text. Device lock-screen behavior and push delivery tests remain |
