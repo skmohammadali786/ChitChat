@@ -25,7 +25,7 @@ Legend:
 | Conversation list and history | PARTIAL | Signed-in list loads real Supabase conversation records with account isolation and loading/empty/error states; message history rendering, pagination and decryption are not implemented |
 | Real-time message delivery | PARTIAL | Conversation realtime foundations exist, but authenticated client inserts are disabled until MLS protocol validation is implemented; history subscription/reconnect behavior remains unverified |
 | Voice and video calls | NOT STARTED | Native WebRTC engine, microphone/camera permissions, authenticated call signaling, STUN/TURN configuration, incoming-call lifecycle, call controls and Android/iOS device tests |
-| End-to-end encryption | NOT STARTED | OpenMLS 0.9.2 is the selected MLS protocol, but its Rust engine, durable protected group storage, device credentials/key packages, key rotation, native Android/iOS bridge, cross-platform vectors and independent review are not implemented |
+| End-to-end encryption | PARTIAL | OpenMLS 0.9.2 RustCrypto core and two-client application-message/key-rotation test are added; durable protected storage, device credentials/key packages, native Android/iOS bridge, cross-platform device vectors and independent review remain |
 | Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
@@ -56,7 +56,7 @@ Legend:
 | Cloudflare R2 private bucket | DONE | Private bucket created; public r2.dev domain disabled |
 | Authenticated media API | PARTIAL | Worker deployed; unauthenticated requests rejected; signed-in upload/download integration tests still required |
 | Supabase media metadata | PARTIAL | RLS table and migration installed; authenticated device-level tests required |
-| Rust media encryption | NOT STARTED | Encrypt/decrypt files, chunking, digest verification and crypto-version compatibility |
+| Rust media encryption | PARTIAL | XChaCha20-Poly1305 file encryption/decryption, fresh per-object key/nonce, media-kind associated data, SHA-256 integrity and crypto-version checks are implemented in Rust; native bridge and chunked streaming remain |
 | Image/video/audio/file picker | NOT STARTED | Native pickers, size limits, upload progress and retry |
 | Large media | NOT STARTED | Resumable/multipart upload, pause/resume and cleanup |
 | Media expiry and cleanup | NOT STARTED | Delete expired R2 objects and Supabase metadata safely |

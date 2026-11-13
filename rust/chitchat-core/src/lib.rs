@@ -6,9 +6,12 @@
 //! before the UI enables sending.
 
 mod message;
+mod media_crypto;
+mod mls_engine;
 mod profile;
 mod result;
 
+pub use media_crypto::{decrypt_media, encrypt_media, EncryptedMedia};
 pub use message::{
     EncryptedEnvelope, MediaKind, MessageBlock, MessageContent, MessageKind,
     validate_envelope, validate_message_content,

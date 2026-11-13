@@ -36,4 +36,22 @@ pub enum CoreError {
     /// A media reference contains invalid encryption metadata.
     #[error("Encrypted media metadata is invalid.")]
     InvalidMediaAttachment,
+    /// Media encryption could not complete.
+    #[error("Media encryption failed.")]
+    MediaEncryptionFailed,
+    /// Media decryption or authentication failed.
+    #[error("Media decryption failed or the authentication tag is invalid.")]
+    MediaDecryptionFailed,
+    /// Media metadata does not match the supported format.
+    #[error("Encrypted media metadata does not match the supported format.")]
+    InvalidMediaMetadata,
+    /// The encoded media key is not a valid 32-byte key.
+    #[error("The encrypted media key is invalid.")]
+    InvalidMediaKey,
+    /// The encoded media nonce is not a valid 24-byte nonce.
+    #[error("The encrypted media nonce is invalid.")]
+    InvalidMediaNonce,
+    /// The ciphertext digest does not match the downloaded bytes.
+    #[error("The encrypted media digest does not match the downloaded bytes.")]
+    MediaDigestMismatch,
 }
