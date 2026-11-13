@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { chitchatCore, type DevicePublicBundle } from "../../native/chitchatCore";
 import { createTextMessageContent, validateMessageContentShape, type MessageContent } from "./content";
