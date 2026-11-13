@@ -38,3 +38,15 @@ The five initial migration versions missing from the branch have been restored:
 - `20261112180627`, `20261112180642`, `20261112182000`, and `20261112182101` are historical no-op placeholders because their resulting hardened RPC, invoker-wrapper, and private-trigger state is already included in the consolidated baseline.
 
 The later migrations remain in timestamp order. This reconstruction has not yet been tested against a completely empty Supabase database. Do not claim clean-install reproducibility until a fresh database migration test passes. The setup scripts remain available as reference/bootstrap material.
+
+
+## Additional security migrations
+
+The current live project also contains these later migrations, and the repository must preserve the exact filenames and order:
+
+- `20261113030813_add_conversation_reporting.sql`
+- `20261113031015_index_message_reports_target_user.sql`
+- `20261113032833_restrict_scheduled_message_mutation.sql`
+- `20261113032954_disable_unverified_message_writes.sql`
+
+The last migration intentionally removes authenticated client INSERT from `messages` and `scheduled_messages` until the MLS implementation is available. Do not restore those grants as a UI-only change.
