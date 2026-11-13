@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
+import * as ExpoLinking from "expo-linking";
 import {
   ActivityIndicator, Alert, AppState, Linking, View, Text, TextInput, FlatList, ScrollView, useColorScheme,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
@@ -65,6 +66,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  const [passwordResetBusy, setPasswordResetBusy] = useState(false);
+  const [accountSecurityMessage, setAccountSecurityMessage] = useState("");
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
@@ -483,6 +486,26 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setDiscoveryEnabled(profile?.discoverable ?? false);
     setDiscoveryError("");
   }, [profile?.id, profile?.discoverable]);
+
+  async function sendAccountPasswordReset() {
+    if (!profile || !supabase || passwordResetBusy) return;
+    setPasswordResetBusy(true);
+    setAccountSecurityMessage("");
+    try {
+      const { data, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!data.user?.email) throw new Error("This account does not have a recovery email address.");
+      const { error } = await supabase.auth.resetPasswordForEmail(data.user.email, {
+        redirectTo: ExpoLinking.createURL("auth/callback"),
+      });
+      if (error) throw error;
+      setAccountSecurityMessage("Password reset link sent. Open the email on this device to choose a new password.");
+    } catch (caught) {
+      setAccountSecurityMessage(caught instanceof Error ? caught.message : "Could not send the password reset link.");
+    } finally {
+      setPasswordResetBusy(false);
+    }
+  }
 
   async function toggleDiscovery() {
     if (!profile || !supabase || discoveryBusy) return;
@@ -1039,6 +1062,25 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
               ) : null}
             </View>
           )}
+          {profile ? (
+            <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Password and sign-in</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Send a secure password reset link to your account email.</Text>
+                {accountSecurityMessage ? <Text accessibilityRole="alert" style={{ color: accountSecurityMessage.startsWith("Password reset link sent") ? "#167A55" : "#B42318", fontSize: 11, lineHeight: 16, marginTop: 7 }}>{accountSecurityMessage}</Text> : null}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                disabled={passwordResetBusy}
+                onPress={() => void sendAccountPasswordReset()}
+                style={[styles.smallAction, { backgroundColor: accentColor }, passwordResetBusy && { opacity: 0.55 }]}
+              >
+                {passwordResetBusy
+                  ? <ActivityIndicator color="#FFFFFF" size="small" />
+                  : <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>Send link</Text>}
+              </Pressable>
+            </View>
+          ) : null}
           {profile ? (
             <Pressable accessibilityRole="button" onPress={() => setShowGroupCreation(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
               <View style={styles.settingCopy}>
