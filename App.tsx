@@ -768,7 +768,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 {messages.map(message => (
               <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
                 <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
-                  {message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
+                  {message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} dark={dark} accentColor={accentColor} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
                   <Text style={[styles.messageTime, { color: message.mine ? "#E7E2FF" : c.muted }]}>{message.time}  {message.mine ? "✓✓" : ""}</Text>
                 </View>
               </View>
