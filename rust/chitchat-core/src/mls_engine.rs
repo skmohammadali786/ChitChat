@@ -515,6 +515,14 @@ mod tests {
         let received = alice.process_incoming(&group_id, &encrypted, false).expect("decrypt after rotation");
         assert_eq!(received.plaintext.as_deref(), Some(next_message.as_slice()));
 
+        assert_eq!(
+            alice.remove_member(&group_id, 0),
+            Err(CoreError::MlsCannotRemoveSelf)
+        );
+        assert_eq!(
+            alice.remove_member(&group_id, 99),
+            Err(CoreError::MlsMemberNotFound)
+        );
         let removed = alice.remove_member(&group_id, 1).expect("remove Bob from group");
         assert!(removed.epoch > applied.epoch);
         let removal_event = bob
@@ -549,7 +557,15 @@ mod tests {
             runtime.encrypt_content("unused-group", &empty_content),
             Err(CoreError::InvalidMessageContent)
         );
+        assert_eq!(
+            runtime.add_member("unused-group", b"not a KeyPackage"),
+            Err(CoreError::MlsInvalidKeyPackage)
+        );
 
         clear_mls_storage_key().expect("clear test storage key");
+        assert!(matches!(
+            MlsRuntime::open(":memory:"),
+            Err(CoreError::MlsStorageUnavailable)
+        ));
     }
 }
