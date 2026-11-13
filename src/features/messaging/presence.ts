@@ -28,6 +28,15 @@ export function subscribeToConversationPresence(
   const channel = supabase.channel(`conversation:${conversationId}`, {
     config: { private: true, presence: { key: userId }, broadcast: { self: false } },
   });
+  let stopped = false;
+  let readyResolved = false;
+  let resolveReady!: (ready: boolean) => void;
+  const subscriptionReady = new Promise<boolean>(resolve => { resolveReady = resolve; });
+  const finishReady = (ready: boolean) => {
+    if (readyResolved) return;
+    readyResolved = true;
+    resolveReady(ready);
+  };
 
   if (privacy.showOnlineStatus) {
     channel.on("presence", { event: "sync" }, () => {
@@ -43,16 +52,6 @@ export function subscribeToConversationPresence(
       }
     });
   }
-
-  let stopped = false;
-  let readyResolved = false;
-  let resolveReady!: (ready: boolean) => void;
-  const subscriptionReady = new Promise<boolean>(resolve => { resolveReady = resolve; });
-  const finishReady = (ready: boolean) => {
-    if (readyResolved) return;
-    readyResolved = true;
-    resolveReady(ready);
-  };
 
   void supabase.realtime.setAuth().then(() => {
     if (stopped) {

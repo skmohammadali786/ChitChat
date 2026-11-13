@@ -19,8 +19,11 @@ begin
   if v_me is null then
     raise exception 'Authentication required' using errcode='28000';
   end if;
+  if target_conversation_id is null or target_user_id is null then
+    raise exception 'A group and target member are required.' using errcode='22023';
+  end if;
 
-  if new_role not in ('admin','member') then
+  if new_role is null or new_role not in ('admin','member') then
     raise exception 'Role must be admin or member.' using errcode='22023';
   end if;
 

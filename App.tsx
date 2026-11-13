@@ -224,15 +224,21 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   useEffect(() => {
     if (!profile) return;
 
+    let retryInProgress = false;
+    let stopped = false;
     const retryOutbox = async () => {
+      if (retryInProgress || stopped) return;
+      retryInProgress = true;
       try {
         const pending = await listPendingEncryptedMessages();
-        if (pending.length) await flushPendingEncryptedMessages();
+        if (!stopped && pending.length) await flushPendingEncryptedMessages();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!/secure messaging is not ready|protocol adapter is not enabled/i.test(message)) {
           console.warn("ChitChat could not retry pending encrypted messages.", message);
         }
+      } finally {
+        retryInProgress = false;
       }
     };
 
@@ -240,7 +246,10 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     const subscription = AppState.addEventListener("change", state => {
       if (state === "active") void retryOutbox();
     });
-    return () => subscription.remove();
+    return () => {
+      stopped = true;
+      subscription.remove();
+    };
   }, [profile?.id]);
 
   useEffect(() => {
