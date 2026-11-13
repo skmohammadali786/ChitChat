@@ -14,7 +14,7 @@ A feature is verified only when the UI, native logic, backend authorization, err
 
 1. Authenticated conversations are created and listed, but the active real-chat screen is a placeholder. It does not load encrypted message history or subscribe to message inserts.
 2. The active real-chat composer is disabled. The local composer only appends demo messages to React state.
-3. `sendEncryptedMessage` still validates and writes the legacy nonce-based envelope. The OpenMLS ADR explicitly requires a schema and envelope migration before MLS messages can be enabled.
+3. The message service retains the legacy nonce-based envelope shape, but sending is now fail-closed at the service layer and authenticated INSERT is revoked for both messages and scheduled messages. The OpenMLS ADR requires a schema/envelope migration and protocol-aware server acceptance before writes can be restored.
 4. `src/native/chitchatCore.ts` expects `NativeModules.ChitChatCore`, but no Android or iOS implementation of that module exists. A custom build cannot provide Rust functionality until the bridge is implemented and linked.
 5. OpenMLS is an architecture decision only. There is no MLS group lifecycle, key-package exchange, Welcome/Commit handling, persisted MLS state, device verification, or cross-device recovery.
 6. Media metadata and the authenticated R2 Worker exist, but there is no native picker-to-Rust-encryption-to-R2-upload-to-authorized-download-to-Rust-decryption flow.
@@ -22,7 +22,7 @@ A feature is verified only when the UI, native logic, backend authorization, err
 8. Receipt and reaction services/database support exist, but the active chat does not display messages, receipts, or reactions and does not subscribe to receipt/reaction changes.
 9. Presence is wired for an active conversation, but there is no message composer event path to emit typing state. Receipt subscriptions currently create a channel with the same topic as presence/message subscriptions; consolidate these into one conversation channel before enabling them together.
 10. The Calls tab is explicitly a placeholder. Voice/video calling is not implemented.
-11. Settings currently expose dark/light, auto-reveal, push enablement, discovery, block list, and selected privacy toggles. System theme, accent palette selection, notification-preview choices, app lock, biometric enforcement, and contact discovery are not complete.
+11. Settings now expose system/light/dark appearance, six accent palette choices, auto-reveal, push enablement, discovery, block list, sender-only/off notification previews, read-receipt/online/typing/last-seen privacy, and app lock. All-screen accent consistency, real-device lock tests, and contact discovery remain incomplete.
 12. The build has no committed `package-lock.json`. CI uses `npm install`, so dependency resolution is not reproducible.
 13. The latest recorded CI jobs failed before any job steps were reported. No TypeScript, Expo, Rust, formatting, or Clippy result can be treated as verified.
 14. `docs/BUILD_STATUS.md` contradicts the deployed `notify-message` function and its client invocation. It incorrectly says no push-delivery function is deployed. This audit corrects that status.
@@ -49,7 +49,7 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 - Replies, forwarding, copy policy: Missing.
 - Reactions: Partial. Data/service foundation exists; UI and realtime are missing.
 - Encrypted local search: Missing.
-- Pin, mute, archive, hide, delete semantics: Partial. Per-user settings schema exists; complete UI and deletion behavior are missing.
+- Pin, mute, archive, hide, delete semantics: Partial. Per-user pin/mute/archive/hide UI and separate inbox views are implemented. Message-level deletion and secure cache cleanup remain missing.
 - Typing/presence: Partial. Incoming presence/typing foundation exists; outgoing composer integration and cross-device tests are missing.
 - Calls: Missing. Calls tab is only a placeholder.
 
@@ -74,17 +74,17 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 - Offline encrypted outbox and idempotent retry: Missing.
 - Pending/sent/delivered/read/failed UI: Partial. Receipt backend exists; message UI integration is missing.
 - Push: Partial. Registration UI and authenticated generic-alert Edge Function exist; EAS project ID, credentials, device delivery, retry policy, and notification deep-link routing remain unverified.
-- Scheduled messages: Partial. Encrypted envelope table and cron dispatcher exist; compose UI, local schedule UX, and end-to-end delivery tests are missing.
+- Scheduled messages: Partial. A management screen lists and cancels pending entries through an owner-scoped cancel RPC. Creating new entries is blocked until MLS exists; delivery tests remain missing.
 - Disappearing messages: Missing.
 
 ### Privacy, safety, account controls
-- Block/unblock: Partial. Backend and blocked-list UI exist; verify mutual enforcement across lookup, group membership, sends, and notifications.
-- Report user/message: Partial. Private report storage exists; UI, abuse workflow, rate limits, and moderation access controls are missing.
-- App lock/biometric unlock: Missing. Preference fields do not implement a native lock.
-- Notification preview privacy: Partial. Server suppresses preview mode `none`; settings UI does not expose all preview modes or test lock-screen behavior.
+- Block/unblock: Partial. Backend and blocked-list UI exist. Server-side group discoverability, blocked direct-conversation filtering, direct-write block enforcement and push suppression are implemented; multi-user integration tests and group-specific semantics remain.
+- Report user/message: Partial. Direct-account and group report UI calls membership-checked private RPCs. Message reports validate sender identity. Both server paths validate reason/details and serialize a shared five-per-hour limit. Per-message UI, moderation console and triage remain missing.
+- App lock/biometric unlock: Partial. Expo LocalAuthentication gates the signed-in app after backgrounding and prompts on resume; biometrics or device PIN/passcode fallback are supported. Physical Android/iOS testing remains.
+- Notification preview privacy: Partial. UI supports off and sender-only. The notification function never sends message plaintext. Device lock-screen behavior and real push delivery still need tests.
 - Read receipt/online/typing/last-seen controls: Partial. Preferences and presence service exist; UI semantics and cross-device enforcement require tests.
 - Contact permission/discovery: Missing.
-- Spam/abuse controls: Partial. Username lookup throttling exists; message, media, invite, and report throttles remain.
+- Spam/abuse controls: Partial. Username lookup throttling and serialized report throttling exist. Message, media and invite abuse limits remain.
 
 ### External sharing and business model
 - External secret links: Partial. Storage schema exists; token-hash endpoints, expiry, revoke, and reveal web page are missing.
@@ -93,8 +93,8 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 - Storage/customization tiers: Missing server-enforced quota and entitlement checks.
 
 ### Appearance, accessibility, release
-- Dark/light/system: Partial. Dark/light preference syncs; system mode and consistent token coverage are missing.
-- Accent palette: Partial. Preference field exists; picker and full-screen token wiring are missing.
+- Dark/light/system: Partial. System/light/dark selection follows OS appearance and syncs to Supabase; semantic token coverage still varies by screen.
+- Accent palette: Partial. Six accent choices persist locally and to Supabase and recolor key controls; full-screen token wiring remains.
 - Design system: Partial. Components/tokens exist; screen coverage and loading/error/empty states need review.
 - Reduced motion: Partial. Must cover reveal and navigation animation.
 - Accessibility: Missing systematic TalkBack, VoiceOver, labels, focus, contrast, and touch-target tests.
