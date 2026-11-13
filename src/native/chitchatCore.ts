@@ -21,6 +21,7 @@ type CoreModule = {
   validateEnvelope(payload: string): Promise<string>;
   createDeviceIdentity?: (userId: string) => Promise<string>;
   verifyDeviceBundle?: (payload: string) => Promise<string>;
+  startWebRtcCall?: (payload: string) => Promise<string>;
 };
 
 const nativeCore = NativeModules.ChitChatCore as CoreModule | undefined;
@@ -35,6 +36,10 @@ const nativeCore = NativeModules.ChitChatCore as CoreModule | undefined;
 export const chitchatCore = {
   get available(): boolean {
     return Platform.OS !== "web" && Boolean(nativeCore);
+  },
+
+  get webrtcAvailable(): boolean {
+    return Platform.OS !== "web" && typeof nativeCore?.startWebRtcCall === "function";
   },
 
   get deviceIdentityAvailable(): boolean {

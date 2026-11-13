@@ -10,6 +10,7 @@ import {
   listMyCallSessions,
   respondToCallSession,
   subscribeToCallInbox,
+  subscribeToCallSignals,
   type CallSession,
 } from "./calls";
 
@@ -61,6 +62,16 @@ export function CallsScreen({ userId, conversations }: Props) {
       setNotice("Incoming call request received. Voice and video media are not available in this build yet.");
     }, setRealtimeStatus);
   }, [refresh, userId]);
+
+  useEffect(() => {
+    const activeCalls = calls.filter(call => call.status === "ringing" || call.status === "accepted");
+    const subscriptions = activeCalls.map(call =>
+      subscribeToCallSignals(call.id, event => {
+        if (event === "call-state") void refresh();
+      }),
+    );
+    return () => subscriptions.forEach(unsubscribe => unsubscribe());
+  }, [calls, refresh]);
 
   const labelsByConversation = useMemo(
     () => new Map(conversations.map(item => [item.conversationId, item])),

@@ -24,7 +24,7 @@ export type CallInboxEvent = {
   created_at: string;
 };
 
-export type CallSignalEvent = "offer" | "answer" | "ice-candidate" | "hangup";
+export type CallSignalEvent = "offer" | "answer" | "ice-candidate" | "hangup" | "call-state";
 
 function client() {
   if (!supabase) throw new Error("ChitChat Supabase is not configured.");
@@ -85,10 +85,14 @@ export async function createCallSession(
       created_at: new Date().toISOString(),
     });
   } catch (error) {
-    await client().rpc("end_call_session", {
-      target_call_id: data,
-      requested_reason: "ring_delivery_failed",
-    }).catch(() => undefined);
+    try {
+      await client().rpc("end_call_session", {
+        target_call_id: data,
+        requested_reason: "ring_delivery_failed",
+      });
+    } catch {
+      // The server-side 45-second expiry marks undelivered calls as missed.
+    }
     throw error;
   }
   return data;
@@ -178,7 +182,17 @@ export function subscribeToCallSignals(
     .on("broadcast", { event: "offer" }, ({ payload }) => { if (!stopped) onSignal("offer", payload); })
     .on("broadcast", { event: "answer" }, ({ payload }) => { if (!stopped) onSignal("answer", payload); })
     .on("broadcast", { event: "ice-candidate" }, ({ payload }) => { if (!stopped) onSignal("ice-candidate", payload); })
-    .on("broadcast", { event: "hangup" }, ({ payload }) => { if (!stopped) onSignal("hangup", payload); });
+    .on("broadcast", { event: "hangup" }, ({ payload }) => { if (!stopped) onSignal("hangup", payload); })
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "call_sessions",
+        filter: `id=eq.${callId}`,
+      },
+      payload => { if (!stopped) onSignal("call-state", payload.new); },
+    );
 
   void supabaseClient.realtime.setAuth().then(() => {
     if (!stopped) channel.subscribe(status => {
@@ -203,7 +217,7 @@ export async function sendCallSignal(
   payload: unknown,
 ): Promise<void> {
   if (!callId) throw new Error("A call ID is required.");
-  if (!["offer", "answer", "ice-candidate", "hangup"].includes(event)) {
+  if (!["offer", "answer", "ice-candidate", "hangup"].includes(event) || event === "call-state") {
     throw new Error("Unsupported call signaling event.");
   }
   const encoded = JSON.stringify(payload);
