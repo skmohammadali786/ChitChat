@@ -156,7 +156,7 @@ export const chitchatCore = {
       !value.signed_prekey_public ||
       !value.signed_prekey_signature ||
       value.key_version !== 1 ||
-      !/^\\d{10}$/.test(value.fingerprint)
+      !/^\d{10}$/.test(value.fingerprint)
     ) {
       throw new Error("The native device identity returned an invalid public bundle.");
     }
