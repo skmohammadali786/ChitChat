@@ -71,6 +71,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [deviceVerificationChat, setDeviceVerificationChat] = useState<Chat | null>(null);
   const [reportingChat, setReportingChat] = useState<Chat | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [highlightedCallId, setHighlightedCallId] = useState<string | null>(null);
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
   const [discoveryError, setDiscoveryError] = useState("");
@@ -494,6 +495,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
 
   useEffect(() => {
     if (!openCallId) return;
+    setHighlightedCallId(openCallId);
     setTab("Calls");
     onNotificationHandled?.();
   }, [openCallId, onNotificationHandled]);
@@ -1091,7 +1093,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         </>
       ) : tab === "Calls" ? (
         <CallsScreen
-          highlightCallId={openCallId}
+          highlightCallId={highlightedCallId}
           userId={profile?.id ?? null}
           conversations={chats
             .filter(chat => chat.isReal && !chat.isGroup && chat.conversationId && chat.remoteUserId)

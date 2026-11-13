@@ -30,6 +30,14 @@ export async function enablePushNotifications(): Promise<string> {
       vibrationPattern: [0, 180, 100, 180],
       lightColor: "#7665D8",
     });
+    await Notifications.setNotificationChannelAsync("calls", {
+      name: "Calls",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 260, 160, 260, 160, 260],
+      lightColor: "#7665D8",
+      sound: "default",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+    });
   }
 
   const existing = await Notifications.getPermissionsAsync();

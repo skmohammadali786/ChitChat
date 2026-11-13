@@ -105,7 +105,6 @@ Deno.serve(
           body: `${callerLabel} is calling you.`,
           priority: "high",
           channelId: "calls",
-          categoryId: "incoming_call",
           data: {
             type: "incoming_call",
             call_id: call.id,

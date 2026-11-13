@@ -161,7 +161,7 @@ export function CallsScreen({ userId, conversations, highlightCallId = null }: P
           const label = conversation?.label ?? "ChitChat contact";
           const outgoing = call.caller_id === userId;
           return (
-            <View key={call.id} style={styles.card}>
+            <View key={call.id} style={[styles.card, call.id === highlightCallId && styles.highlighted]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{label}</Text>
                 <Text style={styles.cardMeta}>{outgoing ? "Outgoing" : "Incoming"} · {call.call_type === "video" ? "Video" : "Audio"} · {new Date(call.created_at).toLocaleDateString()}</Text>
