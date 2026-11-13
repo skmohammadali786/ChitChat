@@ -94,3 +94,10 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - Added a Hidden inbox alongside Inbox and Archived.
 - Long-press conversation controls now support hide/unhide as a per-user preference, separate from archiving.
 - Account changes clear active chats, drafts in memory, and view state. Signed-in inboxes no longer retain demo sample conversations.
+
+
+## Message-write security gate
+
+- Supabase now revokes authenticated INSERT privileges on `messages` and `scheduled_messages` and drops their direct insert policies until a server-verifiable MLS protocol acceptance path exists.
+- Scheduled-message UPDATE is revoked. Users cancel pending rows through a dedicated ownership-checked RPC.
+- The live database has no authenticated INSERT grants for either table. Existing scheduled rows can still be read and cancelled. The secure composer remains disabled.
