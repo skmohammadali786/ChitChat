@@ -93,6 +93,14 @@ class ChitChatCoreModule : Module() {
       requireBridge().joinGroup(welcomeBase64)
     }
 
+    AsyncFunction("encryptContentForMessage") { groupId: String, messageId: String, contentJson: String ->
+      requireBridge().encryptContentForMessage(groupId, messageId, contentJson)
+    }
+
+    AsyncFunction("getLocalMessageContent") { messageId: String ->
+      requireBridge().getLocalMessageContent(messageId)
+    }
+
     AsyncFunction("encryptContent") { groupId: String, contentJson: String ->
       requireBridge().encryptContent(groupId, contentJson)
     }
@@ -113,7 +121,7 @@ class ChitChatCoreModule : Module() {
       requireBridge().removeMember(groupId, leafIndex.toUInt())
     }
 
-    AsyncFunction("encryptMediaFile") { uri: String, groupId: String, mediaKind: String, concealed: Boolean ->
+    AsyncFunction("encryptMediaFile") { uri: String, groupId: String, mediaKind: String, concealed: Boolean, messageId: String ->
       require(uri.startsWith("content://") || uri.startsWith("file://")) { "A local Android file URI is required." }
       require(mediaKind in listOf("image", "video", "audio", "file")) { "Unsupported media kind." }
       val context = appContext.reactContext
@@ -126,6 +134,7 @@ class ChitChatCoreModule : Module() {
       requireBridge().encryptMediaAndWrap(
         groupId,
         objectId,
+        messageId,
         bytes.map { it.toUByte() },
         mediaKind,
         concealed,
