@@ -45,7 +45,7 @@ export async function loadMessageReactionSummaries(messageIds:string[]):Promise<
 }
 export function subscribeToMessageReactions(conversationId:string,onChange:()=>void,onStatus?:(status:string)=>void):()=>void{
  if(!conversationId)throw new Error("A conversation is required.");let stopped=false;
- const channel=client().channel("conversation:"+conversationId,{config:{private:true}}).on("postgres_changes",{event:"*",schema:"public",table:"message_reactions",filter:"conversation_id=eq."+conversationId},()=>onChange());
+ const channel=client().channel("conversation:"+conversationId,{config:{private:true}}).on("postgres_changes",{event:"*",schema:"public",table:"message_reactions"},()=>onChange());
  void client().realtime.setAuth().then(()=>{if(!stopped)channel.subscribe(status=>onStatus?.(status));}).catch(()=>onStatus?.("CHANNEL_ERROR"));
  return ()=>{stopped=true;void client().removeChannel(channel);};
 }

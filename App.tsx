@@ -748,7 +748,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       if (!activeChat.conversationId) return;
       setRealMessageError("");
       try {
-        const record = await sendMlsTextMessage(activeChat.conversationId, value, { concealed: draftSecret });
+        const expiresAt = messageTtlSeconds ? new Date(Date.now() + messageTtlSeconds * 1000).toISOString() : null;
+        const record = await sendMlsTextMessage(activeChat.conversationId, value, { concealed: draftSecret, expiresAt });
         setRealMessagesByChat(current => ({
           ...current,
           [activeChat.id]: [
@@ -1075,6 +1076,9 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
               <Pressable accessibilityRole="switch" accessibilityLabel="Conceal this message" accessibilityState={{ checked: draftSecret }} onPress={() => setDraftSecret(value => !value)} style={[styles.secretToggle, draftSecret && styles.secretToggleOn]}>
                 <Text style={[styles.secretToggleText, draftSecret && styles.secretToggleTextOn]}>✦</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Disappearing message duration " + (messageTtlSeconds ? messageTtlSeconds + " seconds" : "off")} onPress={() => setMessageTtlSeconds(value => value === null ? 3600 : value === 3600 ? 86400 : value === 86400 ? 604800 : null)} style={{ minWidth: 38, minHeight: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: messageTtlSeconds ? accentColor : c.raised, paddingHorizontal: 5 }}>
+                <Text style={{ color: messageTtlSeconds ? "#FFFFFF" : c.muted, fontSize: 9, fontWeight: "900" }}>{messageTtlSeconds === 3600 ? "1h" : messageTtlSeconds === 86400 ? "24h" : messageTtlSeconds === 604800 ? "7d" : "Off"}</Text>
               </Pressable>
               <TextInput value={draft} onChangeText={handleDraftChange} placeholder={draftSecret ? "Write a concealed message..." : "Write an encrypted message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
               <Pressable accessibilityRole="button" accessibilityLabel="Send encrypted message" disabled={!draft.trim()} onPress={() => void sendMessage()} style={[styles.sendButton, !draft.trim() && { opacity: 0.55 }]}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
