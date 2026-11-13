@@ -15,7 +15,7 @@ export async function reportConversation(input: {
   details?: string;
 }): Promise<string> {
   if (!input.conversationId) throw new Error("Choose a conversation to report.");
-  if (input.details && input.details.length > 2000) throw new Error("Report details cannot exceed 2000 characters.");
+  if (input.details && input.details.length > 1000) throw new Error("Report details cannot exceed 1000 characters.");
 
   const { data: auth, error: authError } = await client().auth.getUser();
   if (authError) throw authError;
