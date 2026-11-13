@@ -18,6 +18,8 @@ export type EncryptedMediaPayload = {
   cryptoVersion: number;
   /** Encrypted file-key envelope. This is MLS-protected for message media. */
   keyEnvelope: string;
+  /** UUID embedded in the MLS media block and used as the R2 object ID. */
+  objectId: string;
 };
 
 export type StoredMedia = {
@@ -29,7 +31,7 @@ export type StoredMedia = {
   storage: "cloudflare-r2";
 };
 
-function decodeBase64(value: string): ArrayBuffer {
+export function decodeBase64ToArrayBuffer(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
   if (!normalized || !/^[A-Za-z0-9+/]+$/.test(normalized) || normalized.length % 4 === 1) {
     throw new Error("The native Rust module returned invalid base64 ciphertext.");
@@ -74,7 +76,7 @@ function encodeBase64(value: ArrayBuffer): string {
     }
     chunks.push(encoded);
   }
-  return chunks.join("");
+  return chunks.join("").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 async function sessionToken(): Promise<string> {
@@ -120,6 +122,7 @@ export async function uploadEncryptedMedia(
     throw new Error("The Rust media encryption metadata is invalid.");
   }
 
+  if (!/^[0-9a-f-]{36}$/i.test(payload.objectId)) throw new Error("An encrypted media object ID is required.");
   const token = await sessionToken();
   const response = await fetch(
     `${requireMediaApi()}/v1/conversations/${encodeURIComponent(conversationId)}/media`,
@@ -132,12 +135,17 @@ export async function uploadEncryptedMedia(
         "x-content-sha256": payload.sha256,
         "x-chitchat-crypto-version": String(payload.cryptoVersion),
         "x-chitchat-key-envelope": payload.keyEnvelope,
+        "x-chitchat-object-id": payload.objectId,
       },
       body: payload.bytes,
     },
   );
   if (!response.ok) throw await readError(response);
-  return await response.json() as StoredMedia;
+  const stored = await response.json() as StoredMedia;
+  if (stored.id !== payload.objectId || stored.media_kind !== mediaKind || stored.encrypted !== true) {
+    throw new Error("The media server returned metadata that does not match the encrypted message.");
+  }
+  return stored;
 }
 
 export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Promise<StoredMedia> {
@@ -200,20 +208,27 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   return { bytes: await response.arrayBuffer(), sha256, cryptoVersion, keyEnvelope, mediaKind: mediaKind! };
 }
 
-export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
+export async function getDecryptedMediaUri(
+  mediaId: string,
+  authenticatedContentJson: string,
+  objectId: string,
+  expectedKind: MediaKind,
+): Promise<string> {
   if (!chitchatCore.mediaDecryptionAvailable) {
     throw new Error("The protected Rust media decryptor is not linked in this build.");
   }
   const encrypted = await downloadEncryptedMedia(mediaId);
-  if (encrypted.mediaKind === "avatar") {
-    throw new Error("An avatar cannot be opened as a conversation attachment.");
+  if (encrypted.mediaKind !== expectedKind || encrypted.mediaKind === "avatar" || objectId !== mediaId) {
+    throw new Error("The downloaded media does not match the authenticated MLS attachment.");
   }
-  return chitchatCore.decryptMediaFile(mediaId, encodeBase64(encrypted.bytes), {
-    keyEnvelope: encrypted.keyEnvelope,
-    sha256: encrypted.sha256,
-    cryptoVersion: encrypted.cryptoVersion,
-    mediaKind: encrypted.mediaKind,
-  });
+  return chitchatCore.decryptMediaFile(
+    authenticatedContentJson,
+    objectId,
+    encodeBase64(encrypted.bytes),
+    encrypted.sha256,
+    encrypted.cryptoVersion,
+    encrypted.mediaKind,
+  );
 }
 
 /**
@@ -221,36 +236,13 @@ export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
  * only ciphertext. The Cloudflare Worker updates profiles.avatar_path only
  * after the encrypted R2 object and Supabase metadata row are stored.
  */
-export async function encryptAndUploadAvatar(uri: string): Promise<StoredMedia> {
-  if (!uri || !chitchatCore.avatarEncryptionAvailable) {
-    throw new Error("The protected Rust avatar encryption module is not linked in this build.");
-  }
-  const encrypted = await chitchatCore.encryptAvatarFile(uri);
-  return uploadEncryptedAvatar({
-    bytes: decodeBase64(encrypted.ciphertext_base64),
-    sha256: encrypted.sha256,
-    cryptoVersion: encrypted.crypto_version,
-    keyEnvelope: encrypted.key_envelope,
-  });
+export async function encryptAndUploadAvatar(_uri: string): Promise<StoredMedia> {
+  throw new Error("Account-level avatar encryption is not implemented. ChitChat will not upload a plaintext avatar.");
 }
 
 /** Retrieve and decrypt an authorized avatar into the app-private cache. */
-export async function getDecryptedAvatarUri(mediaId: string): Promise<string> {
-  if (!chitchatCore.avatarDecryptionAvailable) {
-    throw new Error("The protected Rust avatar decryptor is not linked in this build.");
-  }
-  const encrypted = await downloadEncryptedMedia(mediaId);
-  if (encrypted.mediaKind !== "avatar") {
-    throw new Error("The requested media object is not a profile avatar.");
-  }
-  if (encrypted.bytes.byteLength > MAX_AVATAR_BYTES + 16) {
-    throw new Error("The encrypted avatar exceeds the 8 MB size limit.");
-  }
-  return chitchatCore.decryptAvatarFile(mediaId, encodeBase64(encrypted.bytes), {
-    keyEnvelope: encrypted.keyEnvelope,
-    sha256: encrypted.sha256,
-    cryptoVersion: encrypted.cryptoVersion,
-  });
+export async function getDecryptedAvatarUri(_mediaId: string): Promise<string> {
+  throw new Error("Account-level avatar decryption is not implemented.");
 }
 
 export async function deleteEncryptedMedia(mediaId: string): Promise<void> {

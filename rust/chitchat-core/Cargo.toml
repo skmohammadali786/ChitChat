@@ -26,5 +26,6 @@ chacha20poly1305 = "0.10"
 getrandom = "0.2.17"
 sha2 = "0.10"
 zeroize = "1.8"
+uniffi = { version = "=0.32.2", features = ["cli"] }
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 x25519-dalek = { version = "2.0", features = ["static_secrets", "zeroize"] }

@@ -2,7 +2,7 @@ name: ChitChat checks
 
 on:
   push:
-    branches: [main, feat/rust-native-supabase]
+    branches: [main, feat/rust-native-supabase, feat/chitchat-mls-runtime]
   pull_request:
     branches: [main]
 

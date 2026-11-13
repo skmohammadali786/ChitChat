@@ -12,7 +12,7 @@ export type PickedMedia = {
   sizeBytes: number;
 };
 
-export const MAX_PICKED_MEDIA_BYTES = 50 * 1024 * 1024;
+export const MAX_PICKED_MEDIA_BYTES = 50 * 1024 * 1024 - 16;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 async function getFileSize(uri: string, knownSize?: number | null): Promise<number> {

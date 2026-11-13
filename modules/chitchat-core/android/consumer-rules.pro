@@ -1,0 +1,1 @@
+-keep class uniffi.chitchat_core.** { *; }

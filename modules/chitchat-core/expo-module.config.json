@@ -1,0 +1,16 @@
+{
+  "platforms": [
+    "apple",
+    "android"
+  ],
+  "apple": {
+    "modules": [
+      "ChitChatCoreModule"
+    ]
+  },
+  "android": {
+    "modules": [
+      "in.skmohammadali.chitchat.ChitChatCoreModule"
+    ]
+  }
+}

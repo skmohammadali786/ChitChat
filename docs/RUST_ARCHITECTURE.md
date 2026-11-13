@@ -43,3 +43,12 @@ Supabase's official client-library matrix currently lists JavaScript/TypeScript,
 
 ## Build gate
 The native bridge is not considered implemented until Android and iOS native builds load the module, Rust tests pass, and device-level integration tests verify the same behavior on both platforms.
+
+
+## OpenMLS runtime API
+
+- The Rust core now exposes a reusable `MlsRuntime` backed by the protected SQLite provider.
+- It can generate device KeyPackages, create groups, add or remove a device, join from a Welcome, validate/encrypt versioned ChitChat text/media payloads, decrypt/validate received application content, read epochs and rotate the local leaf.
+- KeyPackage private material and group secrets remain in protected local storage. Only public KeyPackages and opaque MLS wire messages leave the device.
+- Inbound Commit merging requires an explicit caller authorization flag. The caller must verify the actor role and the expected roster change against the authenticated server state first. Standalone proposals remain rejected pending an explicit approval workflow.
+- This Rust API is not yet exposed through a registered Expo/Android/iOS native module. The app send gate therefore remains closed.

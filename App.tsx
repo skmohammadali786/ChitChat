@@ -3,7 +3,7 @@ import * as Notifications from "expo-notifications";
 import * as ExpoLinking from "expo-linking";
 import * as Network from "expo-network";
 import {
-  ActivityIndicator, Alert, AppState, Linking, View, Text, TextInput, FlatList, ScrollView, useColorScheme,
+  ActivityIndicator, Alert, AppState, Linking, Image, View, Text, TextInput, FlatList, ScrollView, useColorScheme,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
 import { MotionPressable as Pressable } from "./src/components/MotionPressable";
@@ -28,7 +28,11 @@ import { DeviceManagementScreen } from "./src/features/security/DeviceManagement
 import { DeviceVerificationScreen } from "./src/features/security/DeviceVerificationScreen";
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
-import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
+import { blockUser, loadMyConversations, subscribeToEncryptedMessages, type DiscoverableProfile, type EncryptedMessageRecord } from "./src/features/messaging/service";
+import { decryptMlsMessage, loadDecryptedMlsHistory, sendMlsTextMessage, sendMlsMediaMessage, syncConversationMlsGroup } from "./src/features/messaging/mlsTransport";
+import { pickImageOrVideo, pickAudioOrFile, type PickedMedia } from "./src/features/messaging/mediaPicker";
+import { getDecryptedMediaUri } from "./src/features/messaging/mediaService";
+import type { MessageContent, MessageContentBlock } from "./src/features/messaging/content";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { flushPendingEncryptedMessages } from "./src/features/messaging/delivery";
 import { listPendingEncryptedMessages } from "./src/features/messaging/outbox";
@@ -39,7 +43,7 @@ import { loadConversationSettings, loadUserSettings, saveConversationSettings, s
 import { disablePushNotifications, enablePushNotifications, listenForPushTokenChanges, revokeCurrentPushRegistration, syncPushRegistrationIfGranted } from "./src/features/notifications/registration";
 
 type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string; avatarPath?: string | null; pinnedAt?: string | null; mutedUntil?: string | null; archivedAt?: string | null; hiddenAt?: string | null };
-type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
+type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean; mediaUri?: string; mediaKind?: "image" | "video" | "audio" | "file" };
 
 const initialChats: Chat[] = [
   { id: "1", name: "Aarav Mehta", initials: "AM", color: "#F9D8C6", message: "That sounds like a plan ✨", time: "now", unread: 2, online: true },
@@ -83,7 +87,99 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
   const [demoMessagesByChat, setDemoMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [realMessagesByChat, setRealMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [realMessageLoading, setRealMessageLoading] = useState(false);
+  const [realMessageError, setRealMessageError] = useState("");
+  const [mediaSending, setMediaSending] = useState(false);
   const activeMessages = activeChat ? (demoMessagesByChat[activeChat.id] ?? seedMessages) : seedMessages;
+  const activeRealMessages = activeChat ? (realMessagesByChat[activeChat.id] ?? []) : [];
+  useEffect(() => {
+    const conversationId = activeChat?.conversationId;
+    if (!activeChat?.isReal || !conversationId) {
+      setRealMessageLoading(false);
+      setRealMessageError("");
+      return;
+    }
+    let cancelled = false;
+    setRealMessageLoading(true);
+    setRealMessageError("");
+    const toUiMessage = async (record: EncryptedMessageRecord, content: MessageContent): Promise<Message> => {
+      const blocks: MessageContentBlock[] = content.blocks;
+      const text = blocks.filter((block): block is Extract<MessageContentBlock, { type: "text" }> => block.type === "text")
+        .map(block => block.text).join("\\n");
+      const media = blocks.find((block): block is Extract<MessageContentBlock, { type: "media" }> => block.type === "media");
+      let mediaUri: string | undefined;
+      let renderedText = text;
+      if (media) {
+        try {
+          mediaUri = await getDecryptedMediaUri(media.object_id, JSON.stringify(content), media.object_id, media.media_kind);
+        } catch (error) {
+          console.warn("ChitChat authenticated a media message but could not open its attachment.", error);
+          if (!renderedText) renderedText = "Encrypted attachment could not be opened";
+        }
+      }
+      return {
+        id: record.id,
+        mine: record.sender_id === profile?.id,
+        text: renderedText,
+        time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        secret: blocks.some(block => block.concealed === true),
+        mediaUri,
+        mediaKind: media?.media_kind,
+      };
+    };
+    void loadDecryptedMlsHistory(conversationId, 100).then(async result => {
+      if (cancelled) return;
+      const rendered = await Promise.all(result.messages.map(item => toUiMessage(item.record, item.content)));
+      if (cancelled) return;
+      setRealMessagesByChat(current => ({
+        ...current,
+        [activeChat.id]: rendered,
+      }));
+      if (result.undecryptable.length) {
+        setRealMessageError(result.undecryptable.length + " message(s) could not be authenticated or decrypted on this device.");
+      }
+    }).catch(error => {
+      if (!cancelled) setRealMessageError(error instanceof Error ? error.message : "Could not load encrypted message history.");
+    }).finally(() => {
+      if (!cancelled) setRealMessageLoading(false);
+    });
+    const unsubscribe = subscribeToEncryptedMessages(conversationId, record => {
+      if (cancelled || record.expires_at && Date.parse(record.expires_at) <= Date.now()) return;
+      void decryptMlsMessage(record).catch(async () => {
+        await syncConversationMlsGroup(conversationId);
+        return decryptMlsMessage(record);
+      }).then(async content => {
+        if (cancelled) return;
+        const message = await toUiMessage(record, content);
+        setRealMessagesByChat(current => {
+          const existing = current[activeChat.id] ?? [];
+          if (existing.some(item => item.id === message.id)) return current;
+          return { ...current, [activeChat.id]: [...existing, message] };
+        });
+      }).catch(() => {
+        if (!cancelled) setRealMessageError("A new message failed MLS authentication, group synchronization, or attachment decryption.");
+      });
+    }, status => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setRealMessageError("Realtime is disconnected. Pull to refresh to load encrypted history.");
+      }
+    });
+    // MLS Welcome and Commit delivery is authorized through narrow RPCs.
+    // Poll while this conversation is open so a newly issued Welcome is joined
+    // and queued Commits are merged before subsequent messages are rendered.
+    const mlsSyncTimer = setInterval(() => {
+      void syncConversationMlsGroup(conversationId).catch(error => {
+        if (!cancelled) setRealMessageError(error instanceof Error ? error.message : "MLS synchronization failed.");
+      });
+    }, 12000);
+    return () => {
+      cancelled = true;
+      clearInterval(mlsSyncTimer);
+      unsubscribe();
+    };
+  }, [activeChat?.id, activeChat?.conversationId, activeChat?.isReal, profile?.id]);
+
   const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
   const [accentPalette, setAccentPalette] = useState<AccentPalette>("violet");
   const systemColorScheme = useColorScheme();
@@ -675,24 +771,88 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     }
   }
 
-  function sendMessage() {
+  async function sendPickedAttachment(picker: () => Promise<PickedMedia | null>) {
+    if (!activeChat?.isReal || !activeChat.conversationId || mediaSending) return;
+    setMediaSending(true);
+    setRealMessageError("");
+    try {
+      const picked = await picker();
+      if (!picked) return;
+      const expiresAt = messageTtlSeconds ? new Date(Date.now() + messageTtlSeconds * 1000).toISOString() : null;
+      const record = await sendMlsMediaMessage(activeChat.conversationId, picked, { expiresAt, concealed: draftSecret });
+      const message: Message = {
+        id: record.id,
+        mine: true,
+        text: "",
+        time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        secret: draftSecret,
+        mediaUri: picked.uri,
+        mediaKind: picked.kind,
+      };
+      setRealMessagesByChat(current => ({
+        ...current,
+        [activeChat.id]: [...(current[activeChat.id] ?? []).filter(item => item.id !== record.id), message],
+      }));
+      setChats(current => current.map(chat => chat.id === activeChat.id
+        ? { ...chat, message: "Encrypted " + picked.kind + " attachment", time: "now", secret: draftSecret }
+        : chat));
+      setDraftSecret(false);
+    } catch (error) {
+      setRealMessageError(error instanceof Error ? error.message : "The encrypted attachment could not be sent.");
+    } finally {
+      setMediaSending(false);
+    }
+  }
+
+  function showAttachmentPicker() {
+    Alert.alert("Attach encrypted media", "Choose the type of file to send.", [
+      { text: "Photo or video", onPress: () => { void sendPickedAttachment(pickImageOrVideo); } },
+      { text: "Audio or file", onPress: () => { void sendPickedAttachment(pickAudioOrFile); } },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
+  async function sendMessage() {
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
     typingStopTimerRef.current = null;
     void presenceRef.current?.setTyping(false).catch(() => undefined);
     const value = draft.trim();
-    if (!value || !activeChat || activeChat.isReal) return;
+    if (!value || !activeChat) return;
+    if (activeChat.isReal) {
+      if (!activeChat.conversationId) return;
+      setRealMessageError("");
+      try {
+        const expiresAt = messageTtlSeconds ? new Date(Date.now() + messageTtlSeconds * 1000).toISOString() : null;
+        const record = await sendMlsTextMessage(activeChat.conversationId, value, { concealed: draftSecret, expiresAt });
+        setRealMessagesByChat(current => ({
+          ...current,
+          [activeChat.id]: [
+            ...(current[activeChat.id] ?? []),
+            {
+              id: record.id,
+              mine: true,
+              text: value,
+              time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              secret: draftSecret,
+            },
+          ],
+        }));
+        setChats(current => current.map(chat => chat.id === activeChat.id
+          ? { ...chat, message: draftSecret ? "✦ A concealed message" : value, time: "now", secret: draftSecret }
+          : chat));
+        setDraft("");
+        setDraftSecret(false);
+      } catch (error) {
+        setRealMessageError(error instanceof Error ? error.message : "The encrypted message could not be sent.");
+      }
+      return;
+    }
     const sentAt = new Date().toISOString();
     setDemoMessagesByChat(current => ({
       ...current,
       [activeChat.id]: [
         ...(current[activeChat.id] ?? seedMessages),
-        {
-          id: sentAt,
-          mine: true,
-          text: value,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          secret: draftSecret,
-        },
+        { id: sentAt, mine: true, text: value, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), secret: draftSecret },
       ],
     }));
     setChats(current => current.map(chat => chat.id === activeChat.id
@@ -953,16 +1113,33 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         />
         <View style={[styles.encryptionNote, { backgroundColor: activeChat.isReal ? (dark ? "#282342" : "#EEEAFE") : (dark ? "#202B35" : "#EAF6EF") }]}>
           <Text style={{ color: activeChat.isReal ? (dark ? "#D8D0FF" : "#6559A6") : (dark ? "#B8E8CE" : "#327653"), fontSize: 11, textAlign: "center" }}>
-            {activeChat.isReal ? "Conversation created. Sending is paused until end-to-end encryption is ready." : "Demo conversation. Messages are local sample data and are not sent or encrypted."}
+            {activeChat.isReal ? "MLS-protected conversation. Attachments are encrypted before private storage." : "Demo conversation. Messages are local sample data and are not sent or encrypted."}
           </Text>
         </View>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
           <ScrollView contentContainerStyle={styles.messageList}>
             {activeChat.isReal ? (
-              <View style={{ alignItems: "center", paddingHorizontal: 24, paddingVertical: 28 }}>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: "800" }}>Conversation is ready</Text>
-                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 7 }}>ChitChat will enable message sending here after device keys and end-to-end encryption are implemented. No plaintext message has been sent.</Text>
-              </View>
+              <>
+                {realMessageLoading ? <ActivityIndicator color={accentColor} style={{ marginTop: 24 }} /> : null}
+                {realMessageError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, textAlign: "center", paddingHorizontal: 18, paddingTop: 10 }}>{realMessageError}</Text> : null}
+                {activeRealMessages.map(message => (
+                  <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
+                    <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
+                      {message.mediaUri && message.mediaKind === "image" ? (
+                        <Image source={{ uri: message.mediaUri }} resizeMode="cover" style={{ width: 220, height: 170, borderRadius: 12, marginBottom: message.text ? 8 : 0 }} accessibilityLabel="Decrypted image attachment" />
+                      ) : null}
+                      {message.mediaUri && message.mediaKind !== "image" ? (
+                        <Pressable accessibilityRole="button" onPress={() => { void Linking.openURL(message.mediaUri!).catch(() => setRealMessageError("No application could open this decrypted attachment.")); }} style={{ padding: 10, borderRadius: 10, backgroundColor: message.mine ? "rgba(255,255,255,0.15)" : c.raised }}>
+                          <Text style={{ color: message.mine ? "#FFFFFF" : c.text, fontWeight: "700" }}>Open {message.mediaKind} attachment</Text>
+                        </Pressable>
+                      ) : null}
+                      {message.text ? (message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} dark={dark} accentColor={accentColor} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>) : null}
+                      <Text style={[styles.messageTime, { color: message.mine ? "#E7E2FF" : c.muted }]}>{message.time} {message.mine ? "✓" : ""}</Text>
+                    </View>
+                  </View>
+                ))}
+                {!realMessageLoading && activeRealMessages.length === 0 && !realMessageError ? <Text style={{ color: c.muted, textAlign: "center", padding: 24, fontSize: 12 }}>No decrypted messages yet. Messages appear here only after MLS authentication succeeds.</Text> : null}
+              </>
             ) : (
               <>
                 <Text style={[styles.dayLabel, { color: c.muted }]}>TODAY</Text>
@@ -979,7 +1156,17 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           </ScrollView>
           {activeChat.isReal ? (
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
-              <Text style={{ color: c.muted, fontSize: 12, textAlign: "center", flex: 1 }}>Secure messaging is not enabled yet.</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Attach encrypted media" disabled={mediaSending} onPress={showAttachmentPicker} style={{ minWidth: 34, minHeight: 38, alignItems: "center", justifyContent: "center", opacity: mediaSending ? 0.45 : 1 }}>
+                {mediaSending ? <ActivityIndicator color={accentColor} size="small" /> : <Text style={{ color: accentColor, fontSize: 22, fontWeight: "700" }}>＋</Text>}
+              </Pressable>
+              <Pressable accessibilityRole="switch" accessibilityLabel="Conceal this message" accessibilityState={{ checked: draftSecret }} onPress={() => setDraftSecret(value => !value)} style={[styles.secretToggle, draftSecret && styles.secretToggleOn]}>
+                <Text style={[styles.secretToggleText, draftSecret && styles.secretToggleTextOn]}>✦</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={"Disappearing message duration " + (messageTtlSeconds ? messageTtlSeconds + " seconds" : "off")} onPress={() => setMessageTtlSeconds(value => value === null ? 3600 : value === 3600 ? 86400 : value === 86400 ? 604800 : null)} style={{ minWidth: 38, minHeight: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: messageTtlSeconds ? accentColor : c.raised, paddingHorizontal: 5 }}>
+                <Text style={{ color: messageTtlSeconds ? "#FFFFFF" : c.muted, fontSize: 9, fontWeight: "900" }}>{messageTtlSeconds === 3600 ? "1h" : messageTtlSeconds === 86400 ? "24h" : messageTtlSeconds === 604800 ? "7d" : "Off"}</Text>
+              </Pressable>
+              <TextInput value={draft} onChangeText={handleDraftChange} placeholder={draftSecret ? "Write a concealed message..." : "Write an encrypted message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
+              <Pressable accessibilityRole="button" accessibilityLabel="Send encrypted message" disabled={!draft.trim()} onPress={() => void sendMessage()} style={[styles.sendButton, !draft.trim() && { opacity: 0.55 }]}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
             </View>
           ) : (
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>

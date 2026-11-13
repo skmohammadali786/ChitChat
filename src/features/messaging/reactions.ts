@@ -35,3 +35,17 @@ export async function removeMessageReaction(messageId: string, reaction: Message
     .eq("reaction", reaction);
   if (error) throw error;
 }
+
+
+export type MessageReactionSummary={message_id:string;reaction:MessageReaction;count:number;reacted_by_me:boolean};
+export async function loadMessageReactionSummaries(messageIds:string[]):Promise<MessageReactionSummary[]>{
+ const ids=[...new Set(messageIds.filter(Boolean))].slice(0,100);if(!ids.length)return [];
+ const userId=await currentUserId();const {data,error}=await client().from("message_reactions").select("message_id,user_id,reaction").in("message_id",ids);if(error)throw error;
+ const map=new Map<string,MessageReactionSummary>();for(const row of data??[]){if(!MESSAGE_REACTIONS.includes(row.reaction as MessageReaction))continue;const key=row.message_id+":"+row.reaction;const item=map.get(key)??{message_id:row.message_id,reaction:row.reaction as MessageReaction,count:0,reacted_by_me:false};item.count++;item.reacted_by_me ||= row.user_id===userId;map.set(key,item);}return [...map.values()];
+}
+export function subscribeToMessageReactions(conversationId:string,onChange:()=>void,onStatus?:(status:string)=>void):()=>void{
+ if(!conversationId)throw new Error("A conversation is required.");let stopped=false;
+ const channel=client().channel("conversation:"+conversationId,{config:{private:true}}).on("postgres_changes",{event:"*",schema:"public",table:"message_reactions"},()=>onChange());
+ void client().realtime.setAuth().then(()=>{if(!stopped)channel.subscribe(status=>onStatus?.(status));}).catch(()=>onStatus?.("CHANNEL_ERROR"));
+ return ()=>{stopped=true;void client().removeChannel(channel);};
+}

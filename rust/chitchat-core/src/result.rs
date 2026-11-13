@@ -72,4 +72,41 @@ pub enum CoreError {
         /// The verification challenge is missing or has an invalid length.
     #[error("Device verification challenge is invalid.")]
         InvalidDeviceChallenge,
+    /// The protected MLS storage key or encrypted database is unavailable.
+    #[error("Protected MLS storage is locked or unavailable.")]
+    MlsStorageUnavailable,
+    /// The account/device credential identity is malformed.
+    #[error("The MLS account/device identity is invalid.")]
+    MlsInvalidIdentity,
+    /// The encoded MLS group identifier is malformed.
+    #[error("The MLS group identifier is invalid.")]
+    MlsInvalidGroupId,
+    /// The requested group does not exist in protected local storage.
+    #[error("The MLS group was not found in protected local storage.")]
+    MlsGroupNotFound,
+    /// The provided public KeyPackage is malformed or invalid.
+    #[error("The MLS KeyPackage is invalid.")]
+    MlsInvalidKeyPackage,
+    /// The provided Welcome is malformed or is not addressed to this device.
+    #[error("The MLS Welcome is invalid or cannot be processed by this device.")]
+    MlsInvalidWelcome,
+    /// The serialized MLS wire message is malformed or unsupported.
+    #[error("The MLS wire message is invalid.")]
+    MlsInvalidWireMessage,
+    /// Plaintext application content is empty or exceeds the size limit.
+    #[error("MLS application content is empty or exceeds the size limit.")]
+    MlsInvalidPlaintext,
+    /// The OpenMLS operation failed.
+    #[error("The OpenMLS operation failed.")]
+    MlsOperationFailed,
+    /// A proposal or commit requires explicit server-side policy approval.
+    #[error("The MLS control message requires server-side authorization.")]
+    MlsControlMessageRequiresApproval,
+    /// The requested MLS member leaf index is not present in the group.
+    #[error("The MLS member was not found in this group.")]
+    MlsMemberNotFound,
+    /// A local device cannot remove itself through the member-removal API.
+    #[error("Use the explicit leave-group operation to remove this device.")]
+    MlsCannotRemoveSelf,
+
 }
