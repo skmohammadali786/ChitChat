@@ -159,3 +159,6 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 - Authenticated clients no longer have `INSERT` privileges on `public.messages` or `public.scheduled_messages`. Their old insert policies are removed. This closes the direct REST API bypass around the TypeScript crypto gate while the native MLS engine is unavailable.
 - Authenticated clients no longer have `UPDATE` privileges on scheduled-message rows. Cancellation is available only through `public.cancel_scheduled_message(uuid)`, which checks sender ownership and pending status. This prevents a client from rewriting scheduled ciphertext, timing or routing fields after insertion.
 - The scheduled-message manager remains useful for reading/cancelling any existing pending records. Creating new entries is intentionally disabled on the server until the MLS protocol is integrated.
+
+
+- Hardened the existing message-report RPC with supported-reason validation, a 2,000-character details limit, membership checks, rejection of self-reports and the shared five-per-hour reporter limit.
