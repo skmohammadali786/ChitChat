@@ -272,35 +272,6 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     void unlockApplication();
   }, [profile?.id, appLockEnabled, appLocked, securitySettingsReady]);
 
-  if (profile && !securitySettingsReady) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={accentColor} />
-        <Text style={{ color: c.muted, fontSize: 12, marginTop: 10 }}>Checking your security settings</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (profile && appLockEnabled && appLocked) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
-        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
-        <View style={{ width: 66, height: 66, borderRadius: 23, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: "#FFFFFF", fontSize: 36, fontWeight: "900", marginTop: -4 }}>c.</Text>
-        </View>
-        <Text style={{ color: c.text, fontSize: 22, fontWeight: "800", marginTop: spacing.xl }}>ChitChat is locked</Text>
-        <Text style={{ color: c.muted, fontSize: 13, lineHeight: 20, textAlign: "center", marginTop: spacing.sm, maxWidth: 290 }}>
-          Authenticate with your device to open your conversations.
-        </Text>
-        {appLockError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 12, textAlign: "center", marginTop: spacing.lg }}>{appLockError}</Text> : null}
-        <Pressable accessibilityRole="button" onPress={() => void unlockApplication()} style={{ backgroundColor: accentColor, minHeight: 48, paddingHorizontal: 30, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", marginTop: spacing.xl }}>
-          <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>Unlock ChitChat</Text>
-        </Pressable>
-        {onSignOut ? <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 16, marginTop: spacing.sm }}><Text style={{ color: c.muted, fontSize: 12 }}>Sign out</Text></Pressable> : null}
-      </SafeAreaView>
-    );
-  }
-
   useEffect(() => {
     if (!profile || !supabase) return;
     let active = true;
@@ -589,6 +560,35 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       ) : null}
     </View>
   );
+
+  if (profile && !securitySettingsReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={accentColor} />
+        <Text style={{ color: c.muted, fontSize: 12, marginTop: 10 }}>Checking your security settings</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (profile && appLockEnabled && appLocked) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <View style={{ width: 66, height: 66, borderRadius: 23, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 36, fontWeight: "900", marginTop: -4 }}>c.</Text>
+        </View>
+        <Text style={{ color: c.text, fontSize: 22, fontWeight: "800", marginTop: spacing.xl }}>ChitChat is locked</Text>
+        <Text style={{ color: c.muted, fontSize: 13, lineHeight: 20, textAlign: "center", marginTop: spacing.sm, maxWidth: 290 }}>
+          Authenticate with your device to open your conversations.
+        </Text>
+        {appLockError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 12, textAlign: "center", marginTop: spacing.lg }}>{appLockError}</Text> : null}
+        <Pressable accessibilityRole="button" onPress={() => void unlockApplication()} style={{ backgroundColor: accentColor, minHeight: 48, paddingHorizontal: 30, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", marginTop: spacing.xl }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>Unlock ChitChat</Text>
+        </Pressable>
+        {onSignOut ? <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 16, marginTop: spacing.sm }}><Text style={{ color: c.muted, fontSize: 12 }}>Sign out</Text></Pressable> : null}
+      </SafeAreaView>
+    );
+  }
 
   if (showBlockedUsers) {
     return (
