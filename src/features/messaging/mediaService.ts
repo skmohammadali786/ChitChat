@@ -4,6 +4,8 @@ import { chitchatCore } from "../../native/chitchatCore";
 
 const mediaApiUrl = process.env.EXPO_PUBLIC_MEDIA_API_URL?.trim().replace(/\/$/, "");
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 export type MediaKind = "image" | "video" | "audio" | "file";
 
@@ -26,6 +28,54 @@ export type StoredMedia = {
   crypto_version: number;
   storage: "cloudflare-r2";
 };
+
+function decodeBase64(value: string): ArrayBuffer {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+  if (!normalized || !/^[A-Za-z0-9+/]+$/.test(normalized) || normalized.length % 4 === 1) {
+    throw new Error("The native Rust module returned invalid base64 ciphertext.");
+  }
+  const output = new Uint8Array(Math.floor(normalized.length * 6 / 8));
+  let buffer = 0;
+  let bitCount = 0;
+  let offset = 0;
+  for (let index = 0; index < normalized.length; index += 1) {
+    const code = BASE64_ALPHABET.indexOf(normalized[index]);
+    if (code < 0) throw new Error("The native Rust module returned invalid base64 ciphertext.");
+    buffer = ((buffer << 6) | code) & 0xffff;
+    bitCount += 6;
+    if (bitCount >= 8) {
+      bitCount -= 8;
+      output[offset] = (buffer >> bitCount) & 0xff;
+      offset += 1;
+    }
+  }
+  if (offset !== output.byteLength) throw new Error("The native Rust module returned truncated ciphertext.");
+  return output.buffer;
+}
+
+function encodeBase64(value: ArrayBuffer): string {
+  const bytes = new Uint8Array(value);
+  const chunks: string[] = [];
+  const chunkBytes = 12_288;
+  for (let start = 0; start < bytes.length; start += chunkBytes) {
+    const end = Math.min(start + chunkBytes, bytes.length);
+    let encoded = "";
+    for (let index = start; index < end; index += 3) {
+      const first = bytes[index];
+      const hasSecond = index + 1 < end;
+      const hasThird = index + 2 < end;
+      const second = hasSecond ? bytes[index + 1] : 0;
+      const third = hasThird ? bytes[index + 2] : 0;
+      const combined = (first << 16) | (second << 8) | third;
+      encoded += BASE64_ALPHABET[(combined >> 18) & 63];
+      encoded += BASE64_ALPHABET[(combined >> 12) & 63];
+      encoded += hasSecond ? BASE64_ALPHABET[(combined >> 6) & 63] : "=";
+      encoded += hasThird ? BASE64_ALPHABET[combined & 63] : "=";
+    }
+    chunks.push(encoded);
+  }
+  return chunks.join("");
+}
 
 async function sessionToken(): Promise<string> {
   if (!supabase) throw new Error("ChitChat Supabase is not configured.");
@@ -97,8 +147,8 @@ export async function uploadEncryptedAvatar(payload: EncryptedMediaPayload): Pro
   if (!payload.keyEnvelope || payload.keyEnvelope.length < 32 || payload.keyEnvelope.length > 8_192) {
     throw new Error("An encrypted avatar key envelope is required.");
   }
-  if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_MEDIA_BYTES) {
-    throw new Error("Encrypted avatar must be between 1 byte and 50 MB.");
+  if (!(payload.bytes instanceof ArrayBuffer) || payload.bytes.byteLength < 1 || payload.bytes.byteLength > MAX_AVATAR_BYTES) {
+    throw new Error("Encrypted avatar must be between 1 byte and 8 MB.");
   }
   if (!/^[a-f0-9]{64}$/.test(payload.sha256) || !Number.isInteger(payload.cryptoVersion) || payload.cryptoVersion < 1) {
     throw new Error("The Rust avatar encryption metadata is invalid.");
@@ -145,6 +195,40 @@ export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
   }
   const encrypted = await downloadEncryptedMedia(mediaId);
   return chitchatCore.decryptMediaFile(mediaId, encodeBase64(encrypted.bytes), {
+    keyEnvelope: encrypted.keyEnvelope,
+    sha256: encrypted.sha256,
+    cryptoVersion: encrypted.cryptoVersion,
+  });
+}
+
+/**
+ * Encrypt a local avatar through the protected native Rust module and upload
+ * only ciphertext. The Cloudflare Worker updates profiles.avatar_path only
+ * after the encrypted R2 object and Supabase metadata row are stored.
+ */
+export async function encryptAndUploadAvatar(uri: string): Promise<StoredMedia> {
+  if (!uri || !chitchatCore.avatarCryptoAvailable) {
+    throw new Error("The protected Rust avatar encryption/decryption module is not linked in this build.");
+  }
+  const encrypted = await chitchatCore.encryptAvatarFile(uri);
+  return uploadEncryptedAvatar({
+    bytes: decodeBase64(encrypted.ciphertext_base64),
+    sha256: encrypted.sha256,
+    cryptoVersion: encrypted.crypto_version,
+    keyEnvelope: encrypted.key_envelope,
+  });
+}
+
+/** Retrieve and decrypt an authorized avatar into the app-private cache. */
+export async function getDecryptedAvatarUri(mediaId: string): Promise<string> {
+  if (!chitchatCore.avatarDecryptionAvailable) {
+    throw new Error("The protected Rust avatar decryptor is not linked in this build.");
+  }
+  const encrypted = await downloadEncryptedMedia(mediaId);
+  if (encrypted.bytes.byteLength > MAX_AVATAR_BYTES + 16) {
+    throw new Error("The encrypted avatar exceeds the 8 MB size limit.");
+  }
+  return chitchatCore.decryptAvatarFile(mediaId, encodeBase64(encrypted.bytes), {
     keyEnvelope: encrypted.keyEnvelope,
     sha256: encrypted.sha256,
     cryptoVersion: encrypted.cryptoVersion,

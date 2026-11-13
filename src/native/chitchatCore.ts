@@ -105,11 +105,20 @@ export const chitchatCore = {
       && typeof nativeCore?.isProtectedStorageReady === "function";
   },
 
-  get avatarCryptoAvailable(): boolean {
+  get avatarEncryptionAvailable(): boolean {
     return Platform.OS !== "web"
       && typeof nativeCore?.encryptAvatarFile === "function"
+      && typeof nativeCore?.isProtectedStorageReady === "function";
+  },
+
+  get avatarDecryptionAvailable(): boolean {
+    return Platform.OS !== "web"
       && typeof nativeCore?.decryptAvatarFile === "function"
       && typeof nativeCore?.isProtectedStorageReady === "function";
+  },
+
+  get avatarCryptoAvailable(): boolean {
+    return chitchatCore.avatarEncryptionAvailable && chitchatCore.avatarDecryptionAvailable;
   },
 
   async encryptMediaFile(uri: string, conversationId: string, mediaKind: "image" | "video" | "audio" | "file"): Promise<NativeEncryptedMedia> {
@@ -123,7 +132,7 @@ export const chitchatCore = {
   },
 
   async encryptAvatarFile(uri: string): Promise<NativeEncryptedMedia> {
-    if (!uri || !chitchatCore.avatarCryptoAvailable || !nativeCore?.encryptAvatarFile) {
+    if (!uri || !chitchatCore.avatarEncryptionAvailable || !nativeCore?.encryptAvatarFile) {
       throw new Error("The protected Rust avatar encryption module is not linked in this build.");
     }
     if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
@@ -137,7 +146,7 @@ export const chitchatCore = {
     ciphertextBase64: string,
     metadata: { keyEnvelope: string; sha256: string; cryptoVersion: number },
   ): Promise<string> {
-    if (!mediaId || !chitchatCore.avatarCryptoAvailable || !nativeCore?.decryptAvatarFile) {
+    if (!mediaId || !chitchatCore.avatarDecryptionAvailable || !nativeCore?.decryptAvatarFile) {
       throw new Error("The protected Rust avatar decryptor is not linked in this build.");
     }
     if (!nativeCore.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
