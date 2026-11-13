@@ -192,9 +192,9 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     void loadUserSettings().then(saved => {
       if (!active) return;
       setThemeMode(saved.theme);
-      setAccentPalette((saved.accent_palette in accentPalettes ? saved.accent_palette : "violet") as AccentPalette);
+      setAccentPalette((Object.prototype.hasOwnProperty.call(accentPalettes, saved.accent_palette) ? saved.accent_palette : "violet") as AccentPalette);
       void savePreference("appearance.theme", saved.theme);
-      void savePreference("appearance.accentPalette", (saved.accent_palette in accentPalettes ? saved.accent_palette : "violet") as AccentPalette);
+      void savePreference("appearance.accentPalette", (Object.prototype.hasOwnProperty.call(accentPalettes, saved.accent_palette) ? saved.accent_palette : "violet") as AccentPalette);
       setAutoReveal(saved.auto_reveal_secrets);
       setShowReadReceipts(saved.show_read_receipts);
       setShowOnlineStatus(saved.show_online_status);
