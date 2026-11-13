@@ -83,17 +83,11 @@ export async function registerMyDevice(bundle: DevicePublicBundle): Promise<Regi
 
 export async function revokeMyDevice(deviceId: string): Promise<void> {
   if (!deviceId) throw new Error("Choose a device to revoke.");
-  const userId = await currentUserId();
-  const { data, error } = await client()
-    .from("devices")
-    .update({ revoked_at: new Date().toISOString() })
-    .eq("id", deviceId)
-    .eq("user_id", userId)
-    .is("revoked_at", null)
-    .select("id")
-    .maybeSingle();
+  await currentUserId();
+  const { error } = await client().rpc("revoke_my_device", {
+    target_device_id: deviceId,
+  });
   if (error) throw error;
-  if (!data) throw new Error("Device not found or already revoked.");
 }
 
 export type PeerDevice = {
