@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { assertSecureMessagingAvailable } from "./cryptoGate";
 
 export type ScheduledMessageInput = {
   conversationId: string;
@@ -34,6 +35,7 @@ function client() {
 }
 
 export async function scheduleEncryptedMessage(input: ScheduledMessageInput): Promise<ScheduledMessage> {
+  assertSecureMessagingAvailable();
   const sendAt = new Date(input.sendAt);
   if (!Number.isFinite(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {
     throw new Error("Choose a future send time.");
