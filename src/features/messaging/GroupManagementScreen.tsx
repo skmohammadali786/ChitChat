@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TextInput, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { supabase } from "../../lib/supabase";

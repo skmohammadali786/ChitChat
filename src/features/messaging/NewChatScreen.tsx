@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet,
   Text, TextInput, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing, typeScale } from "../../theme/tokens";
 import { createDirectConversation, lookupProfileByUsername, type DiscoverableProfile } from "./service";

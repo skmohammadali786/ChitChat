@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { createGroupConversation } from "./groups";
