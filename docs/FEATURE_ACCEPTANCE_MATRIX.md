@@ -70,7 +70,7 @@ Legend:
 | Pending/sent/delivered/failed states | PARTIAL | Per-recipient receipt rows, message-insert trigger, delivered/read RPCs and realtime subscription exist; UI state mapping remains |
 | Read receipts | PARTIAL | Database receipts and privacy-aware read RPC exist; UI controls and cross-device verification remain |
 | Push notifications | PARTIAL | Expo token registration, authenticated generic sender-only delivery, mute/opt-out enforcement and notification tap routing exist; EAS credentials and real-device delivery/retry tests remain |
-| Scheduled messages | PARTIAL | Encrypted envelope table, client scheduling service and pg_cron dispatcher are installed; UI and delivery tests remain |
+| Scheduled messages | PARTIAL | Encrypted-envelope table and pg_cron dispatcher exist; signed-in users can review and cancel pending entries. New scheduling is correctly blocked until the MLS composer exists; delivery tests and schedule creation UI remain |
 | Disappearing messages | NOT STARTED | Expiry policy, server cleanup and local cache handling |
 
 ## Privacy, safety and account controls
@@ -78,7 +78,7 @@ Legend:
 | Feature | Status | Acceptance requirement |
 |---|---|---|
 | Block/unblock | PARTIAL | Block list and unblock UI exist; direct conversations are hidden, direct message inserts are rejected, group creation/add checks both directions, and push delivery excludes blocked relationships. Multi-user acceptance tests and group-specific block semantics remain |
-| Report message/user | PARTIAL | Private report table exists; reporting UI, abuse triage and rate limits |
+| Report message/user | PARTIAL | Direct-account and group report actions call a private, membership-checked RPC with reason validation and a five-per-hour account limit; message-specific report action, reviewer console, moderation access controls and triage workflow remain |
 | App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
 | Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
 | Notification privacy | PARTIAL | User can disable alerts or show sender only; push payloads never include message text. Device lock-screen behavior and push delivery tests remain |
@@ -99,8 +99,8 @@ Legend:
 
 | Feature | Status | Acceptance requirement |
 |---|---|---|
-| Light/dark/system themes | PARTIAL | Dark/light preference syncs to Supabase user settings; system mode and all-screen token coverage remain |
-| Accent palette selection | PARTIAL | Synced accent token exists; palette picker and all-screen UI wiring remain |
+| Light/dark/system themes | PARTIAL | System/light/dark selection now follows OS appearance and syncs to Supabase; full token coverage across every screen remains |
+| Accent palette selection | PARTIAL | Six palette choices now persist locally and to Supabase and recolor primary controls; full all-screen token coverage remains |
 | Design system | PARTIAL | Astryx-informed conventions, reusable components and state coverage |
 | Reduced motion | PARTIAL | All reveal and navigation animation respects OS setting |
 | Accessibility | NOT STARTED | TalkBack, VoiceOver, focus order, labels, contrast and touch targets |
