@@ -21,6 +21,35 @@ async function currentUser() {
 }
 
 let publishedDeviceCache: { userId: string; result: Promise<{ deviceId: string; bundle: DevicePublicBundle; keyPackage: string }> } | null = null;
+const initialKeyPackageUse = new Set<string>();
+const preparedConversationPackages = new Set<string>();
+
+async function prepareKeyPackageForConversation(conversationId: string, device: { deviceId: string; bundle: DevicePublicBundle; keyPackage: string }): Promise<void> {
+  const key = device.bundle.user_id + ":" + device.deviceId;
+  const conversationKey = key + ":" + conversationId;
+  if (preparedConversationPackages.has(conversationKey)) return;
+  // The first published KeyPackage can be used once. Create a fresh one for
+  // subsequent conversations because OpenMLS KeyPackages are one-time inputs.
+  if (initialKeyPackageUse.has(key)) {
+    const keyPackage = await chitchatCore.generateKeyPackage(device.bundle.user_id + ":" + device.deviceId);
+    const { error } = await client().rpc("publish_my_mls_device", {
+      p_device_id: device.deviceId,
+      p_device_label: "ChitChat device",
+      p_platform: Platform.OS === "ios" ? "ios" : "android",
+      p_identity_key_public: device.bundle.identity_key_public,
+      p_signed_prekey_public: device.bundle.signed_prekey_public,
+      p_signed_prekey_signature: device.bundle.signed_prekey_signature,
+      p_fingerprint: device.bundle.fingerprint,
+      p_key_version: device.bundle.key_version,
+      p_key_package: keyPackage,
+    });
+    if (error) throw error;
+  } else {
+    initialKeyPackageUse.add(key);
+  }
+  preparedConversationPackages.add(conversationKey);
+}
+
 
 export async function publishMyMlsDevice(): Promise<{ deviceId: string; bundle: DevicePublicBundle; keyPackage: string }> {
   const user = await currentUser();
@@ -160,6 +189,7 @@ export async function syncConversationMlsGroup(conversationId: string): Promise<
   if (!conversationId) throw new Error("A conversation is required.");
   const user = await currentUser();
   const device = await publishMyMlsDevice();
+  await prepareKeyPackageForConversation(conversationId, device);
   let group = await readConversationMlsGroup(conversationId);
 
   if (!group) {
