@@ -8,7 +8,7 @@
 
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
-use openmls_rust_crypto::OpenMlsRustCrypto;
+use crate::mls_provider::ProtectedOpenMlsProvider;
 
 /// The mutually supported mandatory-to-implement ChitChat MLS ciphersuite.
 pub const CHITCHAT_CIPHERSUITE: Ciphersuite =
@@ -17,7 +17,7 @@ pub const CHITCHAT_CIPHERSUITE: Ciphersuite =
 /// Create a fresh MLS credential and signer for a single device identity.
 #[cfg(test)]
 fn test_identity(
-    provider: &OpenMlsRustCrypto,
+    provider: &ProtectedOpenMlsProvider,
     identity: &[u8],
 ) -> (SignatureKeyPair, CredentialWithKey) {
     let credential = BasicCredential::new(identity.to_vec());
@@ -38,8 +38,17 @@ mod tests {
 
     #[test]
     fn two_clients_exchange_mls_application_messages_and_rotate_epoch() {
-        let alice_provider = OpenMlsRustCrypto::default();
-        let bob_provider = OpenMlsRustCrypto::default();
+        let _storage_test_guard = crate::mls_storage::MLS_TEST_LOCK
+            .lock()
+            .expect("acquire serialized MLS storage test lock");
+        crate::mls_storage::clear_mls_storage_key().expect("clear previous MLS storage key");
+        crate::mls_storage::install_mls_storage_key(&[0x6b; 32])
+            .expect("install ephemeral test storage key");
+
+        let alice_provider = ProtectedOpenMlsProvider::in_memory()
+            .expect("open Alice encrypted SQLite provider");
+        let bob_provider = ProtectedOpenMlsProvider::in_memory()
+            .expect("open Bob encrypted SQLite provider");
         let (alice_signer, alice_credential) = test_identity(&alice_provider, b"alice-device-1");
         let (bob_signer, bob_credential) = test_identity(&bob_provider, b"bob-device-1");
 
@@ -144,5 +153,6 @@ mod tests {
             panic!("expected an MLS application message after rotation");
         };
         assert_eq!(application.into_bytes(), after_rotation);
+        crate::mls_storage::clear_mls_storage_key().expect("clear MLS test key");
     }
 }

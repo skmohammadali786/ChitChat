@@ -1,14 +1,15 @@
 //! ChitChat shared Rust domain core.
 //!
-//! This crate contains platform-independent validation and message-envelope
-//! rules. It deliberately does not invent an encryption protocol. Production
-//! message encryption must be supplied by a separately reviewed implementation
-//! before the UI enables sending.
+//! This crate contains the OpenMLS protocol primitives, encrypted media and
+//! storage codecs, device identity primitives, and domain validation. The
+//! Android/iOS key lifecycle, native bridge, cross-platform acceptance tests,
+//! and independent protocol review are still required before production sends.
 
 mod message;
 mod media_crypto;
 mod device_identity;
 mod mls_storage;
+mod mls_provider;
 #[cfg(test)]
 mod mls_engine;
 mod profile;
@@ -16,6 +17,7 @@ mod result;
 
 pub use media_crypto::{decrypt_media, encrypt_media, EncryptedMedia};
 pub use device_identity::{generate_device_identity, verify_device_bundle, verify_device_challenge, DeviceIdentity, DevicePublicBundle, VerifiedDeviceFingerprint};
+pub use mls_provider::{ProtectedOpenMlsProvider, ProtectedProviderError, open_protected_mls_storage};
 pub use mls_storage::{
     ChitChatStorageCodec, StorageCodecError, clear_mls_storage_key,
     install_mls_storage_key, mls_storage_is_unlocked,

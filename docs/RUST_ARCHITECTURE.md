@@ -22,7 +22,8 @@
 - OpenMLS SQLite storage uses `ChitChatStorageCodec`, an XChaCha20-Poly1305 codec that encrypts each serialized record with a fresh 192-bit nonce.
 - The codec fails closed until the native platform layer injects a random 32-byte key from Android Keystore or iOS Keychain. No fallback key or plaintext codec is used.
 - Call `install_mls_storage_key` only after the native key provider has loaded or created the device-bound key. Call `clear_mls_storage_key` when locking or signing out.
-- The codec is a storage primitive. The complete native module still has to open the SQLite database at a private app path, run OpenMLS migrations, provide a protected key lifecycle, and expose the API through the Kotlin and Swift modules.
+- `ProtectedOpenMlsProvider` now opens the app-private SQLite path, runs the OpenMLS migrations, combines the encrypted codec with the RustCrypto provider, and refuses to open while the protected key is unavailable. Its in-memory Rust test provider exercises the same codec.
+- The complete native module still has to obtain the device-bound key from Android Keystore or iOS Keychain, inject it into Rust, choose the app-private database path, and expose the provider through Kotlin and Swift modules.
 
 ## Native integration plan
 1. Build the Rust crate for Android targets and package it with the React Native Android module.

@@ -20,6 +20,9 @@ const STORAGE_AAD: &[u8] = b"chitchat-openmls-storage-v1\0";
 
 static STORAGE_KEY: Mutex<Option<Zeroizing<[u8; KEY_BYTES]>>> = Mutex::new(None);
 
+#[cfg(test)]
+pub(crate) static MLS_TEST_LOCK: Mutex<()> = Mutex::new(());
+
 /// Failure modes for encrypted OpenMLS state persistence.
 #[derive(Debug, thiserror::Error)]
 pub enum StorageCodecError {
@@ -155,6 +158,7 @@ mod tests {
 
     #[test]
     fn codec_refuses_plaintext_storage_without_platform_key() {
+        let _guard = MLS_TEST_LOCK.lock().unwrap();
         clear_mls_storage_key().unwrap();
         let value = TestRecord { group_epoch: 4, local_secret: "local-only".into() };
         assert!(matches!(
@@ -181,6 +185,7 @@ mod tests {
 
     #[test]
     fn codec_rejects_wrong_platform_key_and_tampered_data() {
+        let _guard = MLS_TEST_LOCK.lock().unwrap();
         clear_mls_storage_key().unwrap();
         install_mls_storage_key(&[0x11; KEY_BYTES]).unwrap();
         let value = TestRecord { group_epoch: 3, local_secret: "private".into() };
