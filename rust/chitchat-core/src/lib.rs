@@ -7,11 +7,16 @@
 
 mod message;
 mod media_crypto;
+mod mls_storage;
 mod mls_engine;
 mod profile;
 mod result;
 
 pub use media_crypto::{decrypt_media, encrypt_media, EncryptedMedia};
+pub use mls_storage::{
+    ChitChatStorageCodec, StorageCodecError, clear_mls_storage_key,
+    install_mls_storage_key, mls_storage_is_unlocked,
+};
 pub use message::{
     EncryptedEnvelope, MediaKind, MessageBlock, MessageContent, MessageKind,
     validate_envelope, validate_message_content,

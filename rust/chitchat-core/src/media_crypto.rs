@@ -44,23 +44,37 @@ pub fn encrypt_media(plaintext: &[u8], kind: MediaKind) -> CoreResult<EncryptedM
 
     let mut key = [0u8; KEY_BYTES];
     let mut nonce = [0u8; NONCE_BYTES];
-    getrandom::getrandom(&mut key).map_err(|_| CoreError::MediaEncryptionFailed)?;
-    getrandom::getrandom(&mut nonce).map_err(|_| {
+    if getrandom::getrandom(&mut key).is_err() {
         key.zeroize();
-        CoreError::MediaEncryptionFailed
-    })?;
+        return Err(CoreError::MediaEncryptionFailed);
+    }
+    if getrandom::getrandom(&mut nonce).is_err() {
+        key.zeroize();
+        nonce.zeroize();
+        return Err(CoreError::MediaEncryptionFailed);
+    }
 
-    let cipher = XChaCha20Poly1305::new_from_slice(&key).map_err(|_| {
-        key.zeroize();
-        CoreError::MediaEncryptionFailed
-    })?;
+    let cipher = match XChaCha20Poly1305::new_from_slice(&key) {
+        Ok(value) => value,
+        Err(_) => {
+            key.zeroize();
+            nonce.zeroize();
+            return Err(CoreError::MediaEncryptionFailed);
+        }
+    };
     let aad = associated_data(kind);
-    let ciphertext = cipher
-        .encrypt(
-            XNonce::from_slice(&nonce),
-            Payload { msg: plaintext, aad: &aad },
-        )
-        .map_err(|_| CoreError::MediaEncryptionFailed)?;
+    let encrypted = cipher.encrypt(
+        XNonce::from_slice(&nonce),
+        Payload { msg: plaintext, aad: &aad },
+    );
+    let ciphertext = match encrypted {
+        Ok(value) => value,
+        Err(_) => {
+            key.zeroize();
+            nonce.zeroize();
+            return Err(CoreError::MediaEncryptionFailed);
+        }
+    };
 
     let digest = Sha256::digest(&ciphertext);
     let result = EncryptedMedia {
@@ -118,22 +132,22 @@ pub fn decrypt_media(
         return Err(CoreError::InvalidMediaKey);
     }
 
-    let cipher = XChaCha20Poly1305::new_from_slice(&key).map_err(|_| {
-        key.zeroize();
-        nonce_bytes.zeroize();
-        CoreError::InvalidMediaKey
-    })?;
+    let cipher = match XChaCha20Poly1305::new_from_slice(&key) {
+        Ok(value) => value,
+        Err(_) => {
+            key.zeroize();
+            nonce_bytes.zeroize();
+            return Err(CoreError::InvalidMediaKey);
+        }
+    };
     let aad = associated_data(kind);
-    let plaintext = cipher
-        .decrypt(
-            XNonce::from_slice(&nonce_bytes),
-            Payload { msg: ciphertext, aad: &aad },
-        )
-        .map_err(|_| CoreError::MediaDecryptionFailed)?;
-
+    let decrypted = cipher.decrypt(
+        XNonce::from_slice(&nonce_bytes),
+        Payload { msg: ciphertext, aad: &aad },
+    );
     key.zeroize();
     nonce_bytes.zeroize();
-    Ok(plaintext)
+    decrypted.map_err(|_| CoreError::MediaDecryptionFailed)
 }
 
 fn associated_data(kind: MediaKind) -> Vec<u8> {

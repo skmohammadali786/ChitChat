@@ -17,6 +17,13 @@
 - No plaintext message fallback is permitted.
 - Envelope validation is structural only. It does not encrypt, decrypt, authenticate keys, or provide end-to-end encryption.
 
+## Protected OpenMLS local storage
+
+- OpenMLS SQLite storage uses `ChitChatStorageCodec`, an XChaCha20-Poly1305 codec that encrypts each serialized record with a fresh 192-bit nonce.
+- The codec fails closed until the native platform layer injects a random 32-byte key from Android Keystore or iOS Keychain. No fallback key or plaintext codec is used.
+- Call `install_mls_storage_key` only after the native key provider has loaded or created the device-bound key. Call `clear_mls_storage_key` when locking or signing out.
+- The codec is a storage primitive. The complete native module still has to open the SQLite database at a private app path, run OpenMLS migrations, provide a protected key lifecycle, and expose the API through the Kotlin and Swift modules.
+
 ## Native integration plan
 1. Build the Rust crate for Android targets and package it with the React Native Android module.
 2. Build the same crate for iOS targets and package it as an XCFramework.

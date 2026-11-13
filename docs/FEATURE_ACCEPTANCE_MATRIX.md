@@ -25,7 +25,7 @@ Legend:
 | Conversation list and history | PARTIAL | Signed-in list loads real Supabase conversation records with account isolation and loading/empty/error states; message history rendering, pagination and decryption are not implemented |
 | Real-time message delivery | PARTIAL | Conversation realtime foundations exist, but authenticated client inserts are disabled until MLS protocol validation is implemented; history subscription/reconnect behavior remains unverified |
 | Voice and video calls | NOT STARTED | Native WebRTC engine, microphone/camera permissions, authenticated call signaling, STUN/TURN configuration, incoming-call lifecycle, call controls and Android/iOS device tests |
-| End-to-end encryption | PARTIAL | OpenMLS 0.9.2 RustCrypto core and two-client application-message/key-rotation test are added; durable protected storage, device credentials/key packages, native Android/iOS bridge, cross-platform device vectors and independent review remain |
+| End-to-end encryption | PARTIAL | OpenMLS 0.9.2 RustCrypto core and two-client application-message/key-rotation test are added; SQLite storage codec now encrypts each serialized record and fails closed without a Keystore/Keychain-injected key; durable native storage lifecycle, device credentials/key packages, Android/iOS bridge, cross-platform device vectors and independent review remain |
 | Android to iOS and iOS to Android | NOT STARTED | OpenMLS protocol vectors and real Android/iOS two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
