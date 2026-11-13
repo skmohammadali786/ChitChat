@@ -26,14 +26,14 @@ PR #1 remains draft. Do not merge.
 
 - Real authenticated conversations are created/listed, but the active real-chat screen is a placeholder. It does not load message history or subscribe to new message records.
 - The real-chat composer is disabled. The local composer only appends demo messages to in-memory state.
-- OpenMLS 0.9.2 is selected in an ADR but is not integrated. There is no working MLS encryption/decryption, key-package lifecycle, device verification, recovery, or multi-device support.
+- OpenMLS 0.9.2 is integrated into the Rust crate with RustCrypto, a ProtectedOpenMlsProvider, an encrypted SQLite storage codec and a two-client application-message/epoch-rotation test. The test engine is test-only. The production app API, Android/iOS bridge, protected Keychain/Keystore key injection, persistent group lifecycle, key packages, recovery and multi-device support are absent.
 - `src/native/chitchatCore.ts` defines a React Native module contract, but Android and iOS native implementations are absent.
 - The message service still uses the legacy nonce-based envelope. A migration to MLS wire metadata is required before MLS messaging can be enabled.
-- Media encryption/decryption and the picker-to-R2-to-decrypt UI flow are absent. The Worker and metadata schema do not encrypt files.
-- Group management exists, but encrypted group messaging, MLS membership commits and key rotation are absent.
+- SDK58 media pickers, encrypted-media/avatar service methods, R2 key-envelope metadata and profile-avatar update wiring are present in source. The actual native Rust file encrypt/decrypt implementation is not linked, and no picker-to-R2 round trip has passed on a device. The Worker stores ciphertext only; it does not perform encryption.
+- Group creation/management, invitations, accept/decline/revoke, private invitation Realtime updates and generic background push invitations are wired. Encrypted group messaging, MLS membership commits and key rotation are absent.
 - Receipt and reaction backend services are not integrated into an active message UI.
-- Calls are a placeholder. Voice/video calling is not implemented.
-- Offline outbox, disappearing messages, encrypted search, replies, forwarding and complete message actions are absent.
+- Call sessions, participant-only history, expiry, private Realtime signaling, incoming-call push and call notification routing are wired. WebRTC peer connections, microphone/camera capture, TURN configuration and active call controls are not implemented.
+- A bounded per-account ciphertext-only offline outbox, FIFO idempotent retry helper, app-foreground retry and network-reconnection hooks exist. Composer integration remains blocked by the production MLS/native encryption API. Disappearing messages, encrypted search, replies and forwarding remain absent.
 - App lock is now integrated through Expo LocalAuthentication. It locks on app background and automatically prompts on foreground resume, using biometrics where available and device PIN/passcode fallback. Android/iOS lifecycle and lockout tests remain pending.
 - External secret-link endpoints/reveal page and subscription purchase/restore flows are not implemented.
 - System/light/dark theme selection and six accent palette choices are implemented and persisted. Accent usage is not yet consistent across every screen. Reduced-motion behavior exists in SecretReveal but needs broader coverage and testing. Systematic TalkBack/VoiceOver tests are incomplete.

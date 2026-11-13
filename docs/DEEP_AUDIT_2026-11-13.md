@@ -16,12 +16,12 @@ A feature is verified only when the UI, native logic, backend authorization, err
 2. The active real-chat composer is disabled. The local composer only appends demo messages to React state.
 3. The message service retains the legacy nonce-based envelope shape, but sending is now fail-closed at the service layer and authenticated INSERT is revoked for both messages and scheduled messages. The OpenMLS ADR requires a schema/envelope migration and protocol-aware server acceptance before writes can be restored.
 4. `src/native/chitchatCore.ts` expects `NativeModules.ChitChatCore`, but no Android or iOS implementation of that module exists. A custom build cannot provide Rust functionality until the bridge is implemented and linked.
-5. OpenMLS is an architecture decision only. There is no MLS group lifecycle, key-package exchange, Welcome/Commit handling, persisted MLS state, device verification, or cross-device recovery.
-6. Media metadata and the authenticated R2 Worker exist, but there is no native picker-to-Rust-encryption-to-R2-upload-to-authorized-download-to-Rust-decryption flow.
-7. Group creation and member administration exist. Encrypted group messaging, invitation acceptance, device membership changes, and MLS epoch/key rotation do not.
+5. OpenMLS is more than an ADR now: the Rust crate includes a two-client MLS application-message/epoch-rotation test and an encrypted SQLite storage provider. The engine module is still test-only; no production app API, native bridge, Keychain/Keystore key lifecycle, device key-package exchange, persistent group lifecycle or cross-device recovery is wired.
+6. The image/video/document pickers, encrypted-media service methods, R2 Worker key-envelope metadata and avatar profile wiring exist in source. The actual Rust native file encrypt/decrypt functions are still unavailable, so the picker-to-encryption-to-R2-to-decryption flow remains fail-closed and has not been device-tested.
+7. Group creation, owner/admin/member management, expiring invitations, accept/decline/revoke, private Realtime updates and generic background invitation push are wired. Encrypted group messaging, device membership changes and MLS epoch/key rotation remain absent.
 8. Receipt and reaction services/database support exist, but the active chat does not display messages, receipts, or reactions and does not subscribe to receipt/reaction changes.
 9. Presence is wired for an active conversation. The composer now emits outgoing typing broadcasts while the user types and clears them after 1.6 seconds, send, blur or route cleanup. Receipt subscriptions still create a channel with the same topic as presence/message subscriptions; consolidate these into one conversation channel before enabling them together.
-10. The Calls tab is explicitly a placeholder. Voice/video calling is not implemented.
+10. Calls now has authenticated call-session history, expiry, private Realtime signaling, incoming-call push and notification routing. The tab correctly states that media is unavailable. No WebRTC peer connection, microphone/camera capture, TURN service or active call controls are linked.
 11. Settings now expose system/light/dark appearance, six accent palette choices, auto-reveal, push enablement, discovery, block list, sender-only/off notification previews, read-receipt/online/typing/last-seen privacy, and app lock. All-screen accent consistency, real-device lock tests, and contact discovery remain incomplete.
 12. The build has no committed `package-lock.json`. CI uses `npm install`, so dependency resolution is not reproducible.
 13. The latest recorded CI jobs failed before any job steps were reported. No TypeScript, Expo, Rust, formatting, or Clippy result can be treated as verified.
@@ -73,7 +73,7 @@ Legend: **Partial** means a backend, UI, or design foundation exists but the acc
 ### Delivery and reliability
 - Offline encrypted outbox and idempotent retry: Missing.
 - Pending/sent/delivered/read/failed UI: Partial. Receipt backend exists; message UI integration is missing.
-- Push: Partial. Registration UI and authenticated generic-alert Edge Function exist; EAS project ID, credentials, device delivery, retry policy, and notification deep-link routing remain unverified.
+- Push: Partial. Authenticated generic message, incoming-call and group-invitation alerts are deployed; mute/opt-out/block checks and tap routing are wired. EAS project ID/credentials and real-device delivery tests remain unverified.
 - Scheduled messages: Partial. A management screen lists and cancels pending entries through an owner-scoped cancel RPC. Creating new entries is blocked until MLS exists; delivery tests remain missing.
 - Disappearing messages: Missing.
 

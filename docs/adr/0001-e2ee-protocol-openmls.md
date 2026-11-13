@@ -1,6 +1,6 @@
 # ADR 0001: End-to-end encryption protocol
 
-- Status: **Selected for implementation, not yet integrated**
+- Status: **Selected and integrated in Rust tests/storage layer, not yet integrated into the production app**
 - Date: 2026-11-13
 - Decision owner: ChitChat project
 
@@ -67,6 +67,22 @@ References:
 The current `nonce` column was designed for a generic AEAD envelope. MLS wire messages already contain their protocol authentication and encryption structure. Before enabling MLS, migrate the message and scheduled-message schemas so the app does not invent a fake external nonce. Put protocol name, wire-format version, ciphersuite, group ID and epoch in validated metadata.
 
 Do not overload `key_version` with the MLS epoch. Keep wire-format version and MLS epoch as separate fields.
+
+
+## Implementation status (2026-11-13)
+
+The repository now contains the pinned OpenMLS 0.9.2 dependencies, RustCrypto provider, ProtectedOpenMlsProvider, and ChitChatStorageCodec. The Rust tests perform a real two-client Welcome/application-message exchange and a self-update/epoch-rotation exchange using encrypted SQLite storage.
+
+The following production layers are still missing:
+- The MLS engine test module is gated by cfg(test). There is no exported app-level MLS group/session API.
+- No Android Kotlin or iOS Swift module registers NativeModules.ChitChatCore.
+- No UniFFI/Kotlin/Swift bridge or native Rust target package is configured.
+- Android Keystore/iOS Keychain has not injected a device-bound storage key, and no persistent provider lifecycle is wired.
+- The Supabase message envelope/schema still uses the legacy nonce design and has no MLS wire-message acceptance path.
+- No real device key-package/Welcome distribution, group membership Commit workflow, device recovery or multi-device linking exists.
+- No Android/iOS cross-platform vectors, device builds, or independent review have passed.
+
+The test foundation does not enable message sending. The release gate below remains mandatory.
 
 ## Release gate
 
