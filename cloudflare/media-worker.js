@@ -10,7 +10,7 @@ function response(body, status, request) {
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
     "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
-    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope",
+    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope, x-chitchat-media-kind",
     "vary": "Origin",
   });
   return new Response(JSON.stringify(body), { status, headers });
@@ -189,11 +189,12 @@ async function download(request, env, user, id) {
     "x-content-sha256": row.content_sha256,
     "x-chitchat-crypto-version": String(row.crypto_version),
     "x-chitchat-key-envelope": row.key_envelope || "",
+    "x-chitchat-media-kind": row.media_kind,
     "etag": object.httpEtag,
     "access-control-allow-origin": request.headers.get("origin") || "*",
     "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
     "access-control-allow-headers": "authorization, content-type, x-chitchat-media-kind, x-chitchat-crypto-version, x-content-sha256, x-chitchat-key-envelope",
-    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope",
+    "access-control-expose-headers": "etag, x-content-sha256, x-chitchat-crypto-version, x-chitchat-key-envelope, x-chitchat-media-kind",
     "vary": "Origin",
   });
   return new Response(object.body, { status: 200, headers });

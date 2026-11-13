@@ -162,7 +162,7 @@ export const chitchatCore = {
   async decryptMediaFile(
     mediaId: string,
     ciphertextBase64: string,
-    metadata: { keyEnvelope: string; sha256: string; cryptoVersion: number },
+    metadata: { keyEnvelope: string; sha256: string; cryptoVersion: number; mediaKind: "image" | "video" | "audio" | "file" },
   ): Promise<string> {
     if (!mediaId || !chitchatCore.mediaDecryptionAvailable || !nativeCore?.decryptMediaFile) {
       throw new Error("The protected Rust media decryptor is not linked in this build.");

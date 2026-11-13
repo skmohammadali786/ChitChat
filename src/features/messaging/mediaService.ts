@@ -175,6 +175,7 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   sha256: string;
   cryptoVersion: number;
   keyEnvelope: string;
+  mediaKind: MediaKind | "avatar";
 }> {
   if (!mediaId) throw new Error("A media ID is required.");
   const token = await sessionToken();
@@ -185,8 +186,18 @@ export async function downloadEncryptedMedia(mediaId: string): Promise<{
   const sha256 = response.headers.get("x-content-sha256") || "";
   const cryptoVersion = Number(response.headers.get("x-chitchat-crypto-version") || "0");
   const keyEnvelope = response.headers.get("x-chitchat-key-envelope") || "";
-  if (!/^[a-f0-9]{64}$/.test(sha256) || !Number.isInteger(cryptoVersion) || cryptoVersion < 1 || keyEnvelope.length < 32 || keyEnvelope.length > 8_192) throw new Error("The stored media encryption metadata is invalid.");
-  return { bytes: await response.arrayBuffer(), sha256, cryptoVersion, keyEnvelope };
+  const mediaKind = response.headers.get("x-chitchat-media-kind") as MediaKind | "avatar" | null;
+  if (
+    !/^[a-f0-9]{64}$/.test(sha256)
+    || !Number.isInteger(cryptoVersion)
+    || cryptoVersion < 1
+    || keyEnvelope.length < 32
+    || keyEnvelope.length > 8_192
+    || !["image", "video", "audio", "file", "avatar"].includes(mediaKind || "")
+  ) {
+    throw new Error("The stored media encryption metadata is invalid.");
+  }
+  return { bytes: await response.arrayBuffer(), sha256, cryptoVersion, keyEnvelope, mediaKind: mediaKind! };
 }
 
 export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
@@ -194,10 +205,14 @@ export async function getDecryptedMediaUri(mediaId: string): Promise<string> {
     throw new Error("The protected Rust media decryptor is not linked in this build.");
   }
   const encrypted = await downloadEncryptedMedia(mediaId);
+  if (encrypted.mediaKind === "avatar") {
+    throw new Error("An avatar cannot be opened as a conversation attachment.");
+  }
   return chitchatCore.decryptMediaFile(mediaId, encodeBase64(encrypted.bytes), {
     keyEnvelope: encrypted.keyEnvelope,
     sha256: encrypted.sha256,
     cryptoVersion: encrypted.cryptoVersion,
+    mediaKind: encrypted.mediaKind,
   });
 }
 
@@ -225,6 +240,9 @@ export async function getDecryptedAvatarUri(mediaId: string): Promise<string> {
     throw new Error("The protected Rust avatar decryptor is not linked in this build.");
   }
   const encrypted = await downloadEncryptedMedia(mediaId);
+  if (encrypted.mediaKind !== "avatar") {
+    throw new Error("The requested media object is not a profile avatar.");
+  }
   if (encrypted.bytes.byteLength > MAX_AVATAR_BYTES + 16) {
     throw new Error("The encrypted avatar exceeds the 8 MB size limit.");
   }
