@@ -21,7 +21,13 @@ type CoreModule = {
   validateEnvelope(payload: string): Promise<string>;
   createDeviceIdentity?: (userId: string) => Promise<string>;
   verifyDeviceBundle?: (payload: string) => Promise<string>;
+  isProtectedStorageReady?: () => Promise<boolean>;
+  encryptMediaFile?: (uri: string, conversationId: string, mediaKind: string) => Promise<string>;
+  decryptMediaFile?: (mediaId: string, ciphertextBase64: string, metadata: string) => Promise<string>;
+  encryptAvatarFile?: (uri: string) => Promise<string>;
+  decryptAvatarFile?: (mediaId: string, ciphertextBase64: string, metadata: string) => Promise<string>;
   startWebRtcCall?: (payload: string) => Promise<string>;
+  stopWebRtcCall?: (callId: string) => Promise<void>;
 };
 
 const nativeCore = NativeModules.ChitChatCore as CoreModule | undefined;
@@ -39,18 +45,38 @@ export const chitchatCore = {
   },
 
   get webrtcAvailable(): boolean {
-    return Platform.OS !== "web" && typeof nativeCore?.startWebRtcCall === "function";
+    return Platform.OS !== "web"
+      && typeof nativeCore?.startWebRtcCall === "function"
+      && typeof nativeCore?.stopWebRtcCall === "function";
+  },
+
+  get deviceVerificationAvailable(): boolean {
+    return Platform.OS !== "web" && typeof nativeCore?.verifyDeviceBundle === "function";
   },
 
   get deviceIdentityAvailable(): boolean {
     return Platform.OS !== "web"
       && typeof nativeCore?.createDeviceIdentity === "function"
-      && typeof nativeCore?.verifyDeviceBundle === "function";
+      && typeof nativeCore?.verifyDeviceBundle === "function"
+      && typeof nativeCore?.isProtectedStorageReady === "function";
+  },
+
+  get mediaCryptoAvailable(): boolean {
+    return Platform.OS !== "web" && typeof nativeCore?.encryptMediaFile === "function";
+  },
+
+  get avatarCryptoAvailable(): boolean {
+    return Platform.OS !== "web"
+      && typeof nativeCore?.encryptAvatarFile === "function"
+      && typeof nativeCore?.decryptAvatarFile === "function";
   },
 
   async createDeviceIdentity(userId: string): Promise<DevicePublicBundle> {
     if (!userId || !chitchatCore.deviceIdentityAvailable || !nativeCore?.createDeviceIdentity) {
       throw new Error("The protected Rust device identity module is not linked in this build.");
+    }
+    if (!nativeCore?.isProtectedStorageReady || !(await nativeCore.isProtectedStorageReady())) {
+      throw new Error("Protected Android Keystore/iOS Keychain storage is not unlocked. Device keys were not created.");
     }
     const raw = await nativeCore.createDeviceIdentity(userId);
     const value = JSON.parse(raw) as DevicePublicBundle;
@@ -69,7 +95,7 @@ export const chitchatCore = {
   },
 
   async verifyDeviceBundle(bundle: DevicePublicBundle): Promise<VerifiedDeviceFingerprint> {
-    if (!chitchatCore.deviceIdentityAvailable || !nativeCore?.verifyDeviceBundle) {
+    if (!chitchatCore.deviceVerificationAvailable || !nativeCore?.verifyDeviceBundle) {
       throw new Error("The Rust device verification module is not linked in this build.");
     }
     const raw = await nativeCore.verifyDeviceBundle(JSON.stringify(bundle));

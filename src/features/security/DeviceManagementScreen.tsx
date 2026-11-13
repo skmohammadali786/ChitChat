@@ -32,7 +32,7 @@ export function DeviceManagementScreen({ onBack }: Props) {
     try {
       const devices = await listMyDevices();
       setItems(devices);
-      if (chitchatCore.deviceIdentityAvailable) {
+      if (chitchatCore.deviceVerificationAvailable) {
         const checks = await Promise.all(devices.map(async device => {
           if (!device.fingerprint) return [device.id, null] as const;
           try {
@@ -173,7 +173,7 @@ export function DeviceManagementScreen({ onBack }: Props) {
                     <Text selectable style={styles.fingerprint}>Security code {fingerprint.digits}</Text>
                   </>
                 ) : (
-                  <Text style={styles.unverified}>{chitchatCore.deviceIdentityAvailable ? "Signature not verified" : "Local verification unavailable"}</Text>
+                  <Text style={styles.unverified}>{chitchatCore.deviceVerificationAvailable ? "Signature not verified" : "Local verification unavailable"}</Text>
                 )}
               </View>
               <Pressable accessibilityRole="button" disabled={busyId === device.id} onPress={() => confirmRevoke(device)} style={styles.revoke}>

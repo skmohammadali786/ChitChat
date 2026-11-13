@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type CallKind = "audio" | "video";
 export type CallStatus = "ringing" | "accepted" | "rejected" | "cancelled" | "ended" | "missed" | "expired";
@@ -31,16 +32,24 @@ function client() {
   return supabase;
 }
 
-async function waitUntilSubscribed(channel: ReturnType<ReturnType<typeof client>["channel"]>): Promise<void> {
+async function waitUntilSubscribed(channel: RealtimeChannel): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Realtime call channel subscription timed out."));
+    }, 12_000);
+
     channel.subscribe(status => {
       if (settled) return;
       if (status === "SUBSCRIBED") {
         settled = true;
+        clearTimeout(timeout);
         resolve();
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
         settled = true;
+        clearTimeout(timeout);
         reject(new Error(`Realtime call channel failed: ${status}.`));
       }
     });
@@ -170,7 +179,7 @@ export function subscribeToCallInbox(
 export function subscribeToCallSignals(
   callId: string,
   onSignal: (event: CallSignalEvent, payload: unknown) => void,
-  onState: (status: string) = () => undefined,
+  onState: (status: string) => void = () => undefined,
 ): () => void {
   const supabaseClient = client();
   if (!callId) throw new Error("A call ID is required.");

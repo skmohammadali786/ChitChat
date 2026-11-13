@@ -33,7 +33,7 @@ export function DeviceVerificationScreen({ conversationId, peerUserId, peerLabel
       const rows = await listPeerDevices(conversationId, peerUserId);
       setDevices(rows);
       const checked = await Promise.all(rows.map(async device => {
-        if (!device.fingerprint || !chitchatCore.deviceIdentityAvailable) {
+        if (!device.fingerprint || !chitchatCore.deviceVerificationAvailable) {
           return [device.device_id, null] as const;
         }
         try {
@@ -141,7 +141,7 @@ export function DeviceVerificationScreen({ conversationId, peerUserId, peerLabel
           <Text style={styles.infoText}>A signed device key can be checked cryptographically. To confirm who owns it, compare the ten-digit security code on both devices using a separate trusted channel, such as in person or a call you initiated.</Text>
         </View>
 
-        {!chitchatCore.deviceIdentityAvailable ? (
+        {!chitchatCore.deviceVerificationAvailable ? (
           <Text style={styles.warning}>The Rust native verifier is not linked in this build. Device fingerprints cannot be authenticated here, so trust controls are disabled.</Text>
         ) : null}
         {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
@@ -181,7 +181,7 @@ export function DeviceVerificationScreen({ conversationId, peerUserId, peerLabel
                 </Text>
               )}
 
-              {result && chitchatCore.deviceIdentityAvailable ? (
+              {result && chitchatCore.deviceVerificationAvailable ? (
                 <Pressable
                   accessibilityRole="button"
                   disabled={busy}
