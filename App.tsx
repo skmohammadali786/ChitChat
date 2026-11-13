@@ -18,6 +18,7 @@ import { GroupManagementScreen } from "./src/features/messaging/GroupManagementS
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
 import { reportConversation } from "./src/features/messaging/reporting";
+import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
@@ -79,6 +80,11 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState("");
   const [notificationPreview, setNotificationPreview] = useState<"none" | "sender" | "full">("sender");
+  const [securitySettingsReady, setSecuritySettingsReady] = useState(!profile);
+  const [appLockEnabled, setAppLockEnabled] = useState(false);
+  const [appLocked, setAppLocked] = useState(Boolean(profile));
+  const [appLockError, setAppLockError] = useState("");
+  const appLockAuthInProgressRef = useRef(false);
   const pushSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
@@ -187,7 +193,12 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     }), [chats, search, showArchivedConversations]);
 
   useEffect(() => {
-    if (!profile || !supabase) return;
+    if (!profile || !supabase) {
+      setSecuritySettingsReady(true);
+      setAppLockEnabled(false);
+      setAppLocked(false);
+      return;
+    }
     let active = true;
     void loadUserSettings().then(saved => {
       if (!active) return;
@@ -201,11 +212,94 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       setShowTypingStatus(saved.show_typing_status);
       setShowLastSeen(saved.show_last_seen);
       setNotificationPreview(saved.notification_preview);
+      setAppLockEnabled(saved.app_lock_enabled);
+      setAppLocked(saved.app_lock_enabled);
+      setAppLockError("");
     }).catch(error => {
       if (active) setSettingsError(error instanceof Error ? error.message : "Could not load account settings.");
+    }).finally(() => {
+      if (active) setSecuritySettingsReady(true);
     });
     return () => { active = false; };
   }, [profile?.id]);
+
+  async function unlockApplication(): Promise<boolean> {
+    if (appLockAuthInProgressRef.current) return false;
+    appLockAuthInProgressRef.current = true;
+    setAppLockError("");
+    try {
+      await authenticateForAppLock();
+      setAppLocked(false);
+      return true;
+    } catch (error) {
+      setAppLockError(error instanceof Error ? error.message : "Device authentication failed.");
+      return false;
+    } finally {
+      appLockAuthInProgressRef.current = false;
+    }
+  }
+
+  async function updateAppLock(next: boolean) {
+    if (!profile) return;
+    setSettingsError("");
+    setAppLockError("");
+    try {
+      if (next) {
+        await authenticateForAppLock("Confirm ChitChat app lock");
+        await saveUserSettings({ app_lock_enabled: true });
+        setAppLockEnabled(true);
+        setAppLocked(false);
+      } else {
+        await saveUserSettings({ app_lock_enabled: false, biometric_unlock_enabled: false });
+        setAppLockEnabled(false);
+        setAppLocked(false);
+      }
+    } catch (error) {
+      setSettingsError(error instanceof Error ? error.message : "Could not update app lock.");
+    }
+  }
+
+  useEffect(() => {
+    if (!profile || !appLockEnabled) return;
+    const subscription = AppState.addEventListener("change", state => {
+      if (state !== "active") setAppLocked(true);
+    });
+    return () => subscription.remove();
+  }, [profile?.id, appLockEnabled]);
+
+  useEffect(() => {
+    if (!profile || !appLockEnabled || !appLocked || !securitySettingsReady || AppState.currentState !== "active") return;
+    void unlockApplication();
+  }, [profile?.id, appLockEnabled, appLocked, securitySettingsReady]);
+
+  if (profile && !securitySettingsReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={accentColor} />
+        <Text style={{ color: c.muted, fontSize: 12, marginTop: 10 }}>Checking your security settings</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (profile && appLockEnabled && appLocked) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <View style={{ width: 66, height: 66, borderRadius: 23, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 36, fontWeight: "900", marginTop: -4 }}>c.</Text>
+        </View>
+        <Text style={{ color: c.text, fontSize: 22, fontWeight: "800", marginTop: spacing.xl }}>ChitChat is locked</Text>
+        <Text style={{ color: c.muted, fontSize: 13, lineHeight: 20, textAlign: "center", marginTop: spacing.sm, maxWidth: 290 }}>
+          Authenticate with your device to open your conversations.
+        </Text>
+        {appLockError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 12, textAlign: "center", marginTop: spacing.lg }}>{appLockError}</Text> : null}
+        <Pressable accessibilityRole="button" onPress={() => void unlockApplication()} style={{ backgroundColor: accentColor, minHeight: 48, paddingHorizontal: 30, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", marginTop: spacing.xl }}>
+          <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>Unlock ChitChat</Text>
+        </Pressable>
+        {onSignOut ? <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 16, marginTop: spacing.sm }}><Text style={{ color: c.muted, fontSize: 12 }}>Sign out</Text></Pressable> : null}
+      </SafeAreaView>
+    );
+  }
 
   useEffect(() => {
     if (!profile || !supabase) return;
@@ -911,6 +1005,21 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                     );
                   })}
                 </View>
+              </View>
+              <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>App security</Text>
+              <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
+                <View style={styles.settingCopy}>
+                  <Text style={[styles.settingTitle, { color: c.text }]}>App lock</Text>
+                  <Text style={[styles.settingHint, { color: c.muted }]}>Require your device authentication when ChitChat returns from the background. Uses biometrics where available, with device PIN or passcode fallback.</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: appLockEnabled }}
+                  onPress={() => void updateAppLock(!appLockEnabled)}
+                  style={[styles.toggle, appLockEnabled && styles.toggleOn]}
+                >
+                  <View style={[styles.toggleKnob, appLockEnabled && styles.toggleKnobOn]} />
+                </Pressable>
               </View>
               <Text style={[styles.sectionTitle, { color: c.text, marginTop: spacing.lg, marginBottom: spacing.md }]}>Privacy controls</Text>
               <View style={[styles.settingCard, { backgroundColor: c.surface }]}>
