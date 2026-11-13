@@ -41,6 +41,14 @@ class ChitChatCoreModule : Module() {
       bridge?.isReady() == true
     }
 
+    AsyncFunction("getOrCreateDeviceId") { ->
+      val context = appContext.reactContext ?: throw IllegalStateException("Android application context is unavailable.")
+      val prefs = context.getSharedPreferences("chitchat_device", android.content.Context.MODE_PRIVATE)
+      prefs.getString("device_id", null) ?: UUID.randomUUID().toString().also {
+        check(prefs.edit().putString("device_id", it).commit()) { "Could not persist device ID." }
+      }
+    }
+
     Function("isProtectedStorageReady") { ->
       bridge?.isReady() == true
     }
@@ -59,6 +67,14 @@ class ChitChatCoreModule : Module() {
     AsyncFunction("validateEnvelope") { payload: String ->
       validateEnvelopeJson(payload)
       true
+    }
+
+    AsyncFunction("createDeviceIdentity") { userId: String, deviceId: String ->
+      requireBridge().createDeviceIdentity(userId, deviceId)
+    }
+
+    AsyncFunction("verifyDeviceBundle") { payload: String ->
+      requireBridge().verifyDeviceBundle(payload)
     }
 
     AsyncFunction("generateKeyPackage") { identity: String ->

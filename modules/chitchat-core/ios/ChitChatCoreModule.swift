@@ -39,6 +39,17 @@ public final class ChitChatCoreModule: Module {
       return self.bridge?.isReady() == true
     }
 
+    AsyncFunction("getOrCreateDeviceId") { () throws -> String in
+      let key = "chitchat.device-id.v1"
+      if let existing = UserDefaults.standard.string(forKey: key) { return existing }
+      let created = UUID().uuidString.lowercased()
+      UserDefaults.standard.set(created, forKey: key)
+      guard UserDefaults.standard.string(forKey: key) == created else {
+        throw NSError(domain: "ChitChatDevice", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not persist device ID."])
+      }
+      return created
+    }
+
     Function("isProtectedStorageReady") {
       self.bridge?.isReady() ?? false
     }
@@ -57,6 +68,14 @@ public final class ChitChatCoreModule: Module {
     AsyncFunction("validateEnvelope") { (payload: String) throws -> Bool in
       try validateEnvelopeJson(payload: payload)
       return true
+    }
+
+    AsyncFunction("createDeviceIdentity") { (userId: String, deviceId: String) throws -> String in
+      try self.requireBridge().createDeviceIdentity(userId: userId, deviceId: deviceId)
+    }
+
+    AsyncFunction("verifyDeviceBundle") { (payload: String) throws -> String in
+      try self.requireBridge().verifyDeviceBundle(payload: payload)
     }
 
     AsyncFunction("generateKeyPackage") { (identity: String) throws -> String in

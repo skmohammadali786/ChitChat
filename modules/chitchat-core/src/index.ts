@@ -1,1 +1,2 @@
-export { default } from "./ChitChatCoreModule";
+import { requireNativeModule } from "expo-modules-core";
+export default requireNativeModule("ChitChatCore");
