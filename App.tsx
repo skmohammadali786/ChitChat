@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import {
-  ActivityIndicator, Alert, AppState, Linking, SafeAreaView, View, Text, TextInput, Pressable, FlatList, ScrollView, useColorScheme,
+  ActivityIndicator, Alert, AppState, Linking, View, Text, TextInput, FlatList, ScrollView, useColorScheme,
   StyleSheet, KeyboardAvoidingView, Platform, StatusBar
 } from "react-native";
+import { MotionPressable as Pressable } from "./src/components/MotionPressable";
+import { AnimatedSafeAreaView, ScreenTransition } from "./src/components/ScreenTransition";
 import { Avatar } from "./src/components/Avatar";
 import { SecretReveal } from "./src/components/SecretReveal";
 import { accentPalettes, palette, radius, spacing, typeScale } from "./src/theme/tokens";
@@ -63,7 +65,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(seedMessages);
+  const [demoMessagesByChat, setDemoMessagesByChat] = useState<Record<string, Message[]>>({});
+  const activeMessages = activeChat ? (demoMessagesByChat[activeChat.id] ?? seedMessages) : seedMessages;
   const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
   const [accentPalette, setAccentPalette] = useState<AccentPalette>("violet");
   const systemColorScheme = useColorScheme();
@@ -549,8 +552,24 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
 
   function sendMessage() {
     const value = draft.trim();
-    if (!value) return;
-    setMessages(old => [...old, { id: String(Date.now()), mine: true, text: value, time: "now", secret: draftSecret }]);
+    if (!value || !activeChat || activeChat.isReal) return;
+    const sentAt = new Date().toISOString();
+    setDemoMessagesByChat(current => ({
+      ...current,
+      [activeChat.id]: [
+        ...(current[activeChat.id] ?? seedMessages),
+        {
+          id: sentAt,
+          mine: true,
+          text: value,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          secret: draftSecret,
+        },
+      ],
+    }));
+    setChats(current => current.map(chat => chat.id === activeChat.id
+      ? { ...chat, message: draftSecret ? "✦ A concealed message" : value, time: "now", secret: draftSecret }
+      : chat));
     setDraft("");
     setDraftSecret(false);
   }
@@ -578,16 +597,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
 
   if ((profile && !securitySettingsReady) || securitySettingsAccountId !== (profile?.id ?? null)) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
+      <AnimatedSafeAreaView key="security-settings-loading" style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={accentColor} />
         <Text style={{ color: c.muted, fontSize: 12, marginTop: 10 }}>Checking your security settings</Text>
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (profile && appLockEnabled && appLocked) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
+      <AnimatedSafeAreaView key="app-lock" style={{ flex: 1, backgroundColor: c.bg, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <View style={{ width: 66, height: 66, borderRadius: 23, backgroundColor: accentColor, alignItems: "center", justifyContent: "center" }}>
           <Text style={{ color: "#FFFFFF", fontSize: 36, fontWeight: "900", marginTop: -4 }}>c.</Text>
@@ -601,35 +620,35 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           <Text style={{ color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>Unlock ChitChat</Text>
         </Pressable>
         {onSignOut ? <Pressable accessibilityRole="button" onPress={onSignOut} style={{ padding: 16, marginTop: spacing.sm }}><Text style={{ color: c.muted, fontSize: 12 }}>Sign out</Text></Pressable> : null}
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showBlockedUsers) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="blocked-users" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <BlockedUsersScreen onBack={() => setShowBlockedUsers(false)} />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showScheduledMessages && profile) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="scheduled-messages" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <ScheduledMessagesScreen
           dark={dark}
           accentColor={accentColor}
           onBack={() => setShowScheduledMessages(false)}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showProfileEditor && profile) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="profile-editor" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <EditProfileScreen
           profile={profile}
@@ -639,13 +658,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             setShowProfileEditor(false);
           }}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showGroupManagement && activeChat?.isGroup && activeChat.conversationId) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="group-management" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <GroupManagementScreen
           conversationId={activeChat.conversationId}
@@ -661,13 +680,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             setChats(current => current.map(chat => chat.conversationId === activeChat.conversationId ? { ...chat, name: title } : chat));
           }}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showGroupCreation) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="group-creation" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <GroupCreationScreen
           onBack={() => setShowGroupCreation(false)}
@@ -690,13 +709,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             setShowGroupCreation(false);
           }}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (showNewChat) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="new-chat" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <NewChatScreen
           hasAccount={Boolean(profile)}
@@ -704,7 +723,6 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           onSignIn={() => { setShowNewChat(false); onExitDemo?.(); }}
           onConversationCreated={(conversationId: string, person: DiscoverableProfile) => {
             const initials = person.display_name.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
-            setMessages([]);
             const newChat: Chat = {
               id: conversationId,
               name: person.display_name,
@@ -722,13 +740,13 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             setShowNewChat(false);
           }}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   if (activeChat) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+      <AnimatedSafeAreaView key="conversation" style={[styles.safe, { backgroundColor: c.bg }]}>
         <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
         <Header
           title={activeChat.name}
@@ -765,7 +783,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             ) : (
               <>
                 <Text style={[styles.dayLabel, { color: c.muted }]}>TODAY</Text>
-                {messages.map(message => (
+                {activeMessages.map(message => (
               <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
                 <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
                   {message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} dark={dark} accentColor={accentColor} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
@@ -809,14 +827,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             Alert.alert("Report submitted", "Your report was sent privately for review.");
           }}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+    <AnimatedSafeAreaView key="main-tabs" style={[styles.safe, { backgroundColor: c.bg }]}>
       <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
       <Header title="ChitChat" subtitle="A little more personal." newAction={isSupabaseConfigured ? () => setShowNewChat(true) : undefined} />
+      <ScreenTransition key={`${tab}:${conversationListMode}`}>
       {tab === "Chats" ? (
         <>
           <View style={[styles.searchBox, { backgroundColor: c.surface }]}>
@@ -859,7 +878,6 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 accessibilityHint="Open conversation. Long press for pin, mute, and archive options."
                 onLongPress={() => showConversationActions(item)}
                 onPress={() => {
-                  if (!item.isReal) setMessages(seedMessages);
                   setActiveChat(item);
                 }}
                 style={styles.chatRow}
@@ -1104,15 +1122,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           <Text style={[styles.version, { color: c.muted }]}>ChitChat · Early preview · v0.2.0</Text>
         </ScrollView>
       )}
+      </ScreenTransition>
       <View style={[styles.tabBar, { backgroundColor: c.surface, borderTopColor: c.line }]}>
         {(["Chats", "Calls", "Settings"] as const).map(item => (
-          <Pressable key={item} onPress={() => setTab(item)} style={styles.tabItem}>
+          <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} onPress={() => setTab(item)} style={styles.tabItem}>
             <Text style={{ color: tab === item ? accentColor : c.muted, fontSize: 19 }}>{item === "Chats" ? "▤" : item === "Calls" ? "◔" : "⚙"}</Text>
             <Text style={{ color: tab === item ? accentColor : c.muted, fontSize: 11, fontWeight: tab === item ? "700" : "500", marginTop: 4 }}>{item}</Text>
           </Pressable>
         ))}
       </View>
-    </SafeAreaView>
+    </AnimatedSafeAreaView>
   );
 }
 
@@ -1182,26 +1201,26 @@ const styles = StyleSheet.create({
 
 function AppBootScreen() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.paper, alignItems: "center", justifyContent: "center" }}>
+    <AnimatedSafeAreaView key="app-boot" style={{ flex: 1, backgroundColor: palette.paper, alignItems: "center", justifyContent: "center" }}>
       <View style={{ width: 52, height: 52, borderRadius: 18, backgroundColor: palette.brand, alignItems: "center", justifyContent: "center" }}>
         <Text style={{ color: "#FFFFFF", fontSize: 32, fontWeight: "900", marginTop: -3 }}>c.</Text>
       </View>
       <ActivityIndicator color={palette.brand} style={{ marginTop: 22 }} />
       <Text style={{ color: palette.muted, marginTop: 10, fontSize: 12 }}>Preparing your private space</Text>
-    </SafeAreaView>
+    </AnimatedSafeAreaView>
   );
 }
 
 function AuthProblemScreen({ message, onSignOut }: { message: string; onSignOut: () => void }) {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.paper, justifyContent: "center", padding: 24 }}>
+    <AnimatedSafeAreaView key="auth-problem" style={{ flex: 1, backgroundColor: palette.paper, justifyContent: "center", padding: 24 }}>
       <Text style={{ color: palette.ink, fontSize: 23, fontWeight: "800" }}>Account setup needs attention</Text>
       <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 20, marginTop: 10 }}>{message}</Text>
       <Text style={{ color: palette.inkSoft, fontSize: 12, lineHeight: 19, marginTop: 14 }}>Check docs/SUPABASE_SETUP.md in the ChitChat repository. The database schema must be installed and the profiles table exposed through the Supabase Data API.</Text>
       <Pressable accessibilityRole="button" onPress={onSignOut} style={{ backgroundColor: palette.brand, minHeight: 48, borderRadius: radius.md, alignItems: "center", justifyContent: "center", marginTop: 24 }}>
         <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>Sign out</Text>
       </Pressable>
-    </SafeAreaView>
+    </AnimatedSafeAreaView>
   );
 }
 
@@ -1324,11 +1343,11 @@ export default function App() {
   if (demoMode) return <MainApp profile={null} onExitDemo={() => setDemoMode(false)} />;
   if (!authReady) return <AppBootScreen />;
   if (passwordRecovery && session?.user) {
-    return <PasswordRecoveryScreen onDone={() => { void signOut(); }} />;
+    return <ScreenTransition key="password-recovery"><PasswordRecoveryScreen onDone={() => { void signOut(); }} /></ScreenTransition>;
   }
   if (profileLoading) return <AppBootScreen />;
-  if (!session?.user) return <AuthScreen onContinueDemo={() => setDemoMode(true)} />;
+  if (!session?.user) return <ScreenTransition key="authentication"><AuthScreen onContinueDemo={() => setDemoMode(true)} /></ScreenTransition>;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
-  if (!profile) return <ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} />;
+  if (!profile) return <ScreenTransition key="profile-setup"><ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} /></ScreenTransition>;
   return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} onNotificationHandled={() => setNotificationConversationId(null)} />
 }
