@@ -84,6 +84,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [securitySettingsAccountId, setSecuritySettingsAccountId] = useState<string | null>(profile?.id ?? null);
   const [appLockEnabled, setAppLockEnabled] = useState(false);
   const [appLocked, setAppLocked] = useState(Boolean(profile));
+  const [appState, setAppState] = useState(AppState.currentState);
   const [appLockError, setAppLockError] = useState("");
   const appLockAuthInProgressRef = useRef(false);
   const pushSubscriptionRef = useRef<{ remove: () => void } | null>(null);
@@ -288,15 +289,16 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   useEffect(() => {
     if (!profile || !appLockEnabled) return;
     const subscription = AppState.addEventListener("change", state => {
+      setAppState(state);
       if (state !== "active") setAppLocked(true);
     });
     return () => subscription.remove();
   }, [profile?.id, appLockEnabled]);
 
   useEffect(() => {
-    if (!profile || !appLockEnabled || !appLocked || !securitySettingsReady || AppState.currentState !== "active") return;
+    if (!profile || !appLockEnabled || !appLocked || !securitySettingsReady || appState !== "active") return;
     void unlockApplication();
-  }, [profile?.id, appLockEnabled, appLocked, securitySettingsReady]);
+  }, [profile?.id, appLockEnabled, appLocked, securitySettingsReady, appState]);
 
   useEffect(() => {
     if (!profile || !supabase) return;
