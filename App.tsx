@@ -17,7 +17,7 @@ import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScree
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
 import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
-import { reportConversation } from "./src/features/messaging/reporting";
+import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
@@ -55,6 +55,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [showScheduledMessages, setShowScheduledMessages] = useState(false);
+  const [reportingChat, setReportingChat] = useState<Chat | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
@@ -192,6 +193,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     setDraftSecret(false);
     setConversationListMode("inbox");
     setShowScheduledMessages(false);
+    setReportingChat(null);
     setShowGroupManagement(false);
     setShowGroupCreation(false);
     setShowNewChat(false);
@@ -516,30 +518,9 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     ]);
   }
 
-  async function submitConversationReport(chat: Chat, reason: "spam" | "harassment") {
-    if (!chat.isReal || !chat.conversationId) return;
-    try {
-      await reportConversation({
-        conversationId: chat.conversationId,
-        targetUserId: chat.isGroup ? null : chat.remoteUserId ?? null,
-        reason,
-      });
-      Alert.alert("Report submitted", "Your report was sent privately for review.");
-    } catch (error) {
-      Alert.alert("Could not submit report", error instanceof Error ? error.message : "Please try again later.");
-    }
-  }
-
   function showReportReasons(chat: Chat) {
-    Alert.alert(
-      chat.isGroup ? "Report this group" : "Report this account",
-      "Select the closest reason. Reports are private.",
-      [
-        { text: "Spam or unwanted messages", onPress: () => void submitConversationReport(chat, "spam") },
-        { text: "Harassment or unsafe content", onPress: () => void submitConversationReport(chat, "harassment") },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
+    if (!chat.isReal || !chat.conversationId) return;
+    setReportingChat(chat);
   }
 
   function showBlockConfirmation(chat: Chat) {
@@ -752,7 +733,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         <Header
           title={activeChat.name}
           subtitle={typingUserId ? "typing…" : activeChat.isGroup ? "group conversation" : activeChat.online ? "online now" : showLastSeen ? "offline" : "status hidden"}
-          back={() => setActiveChat(null)}
+          back={() => { setReportingChat(null); setActiveChat(null); }}
           action={activeChat.isGroup ? {
             label: "Options",
             onPress: () => Alert.alert(activeChat.name, "Group conversation controls.", [
@@ -815,6 +796,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
             </View>
           )}
         </KeyboardAvoidingView>
+        <ReportConversationModal
+          visible={Boolean(reportingChat)}
+          conversationId={reportingChat?.conversationId ?? ""}
+          targetUserId={reportingChat?.isGroup ? null : reportingChat?.remoteUserId ?? null}
+          targetLabel={reportingChat?.isGroup ? "group" : "account"}
+          dark={dark}
+          accentColor={accentColor}
+          onClose={() => setReportingChat(null)}
+          onSubmitted={() => {
+            setReportingChat(null);
+            Alert.alert("Report submitted", "Your report was sent privately for review.");
+          }}
+        />
       </SafeAreaView>
     );
   }
