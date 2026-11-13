@@ -189,34 +189,38 @@ export async function sendEncryptedMessage(
   if (userError) throw userError;
   if (!user) throw new Error("Sign in before sending a message.");
 
-  const { data, error } = await client
-    .from("messages")
-    .insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      client_message_id: envelope.client_message_id,
-      message_type: envelope.message_type,
-      ciphertext: envelope.ciphertext,
-      nonce: envelope.nonce,
-      crypto_header: envelope.crypto_header,
-      key_version: envelope.key_version,
-      expires_at: envelope.expires_at ?? null,
-    })
-    .select("id, conversation_id, sender_id, client_message_id, message_type, ciphertext, nonce, crypto_header, key_version, created_at, expires_at")
-    .single();
-
-  if (error?.code === "23505") {
-    // The original insert may have reached Postgres even if the client lost
-    // its response. Fetch the existing row so an outbox retry stays idempotent.
-    const { data: existing, error: lookupError } = await client
-      .from("messages")
-      .select("id, conversation_id, sender_id, client_message_id, message_type, ciphertext, nonce, crypto_header, key_version, created_at, expires_at")
-      .eq("sender_id", user.id)
-      .eq("client_message_id", envelope.client_message_id)
-      .maybeSingle();
-    if (!lookupError && existing) return existing as EncryptedMessageRecord;
+  const senderDeviceId = envelope.crypto_header.sender_device_id;
+  const epoch = envelope.crypto_header.epoch;
+  if (typeof senderDeviceId !== "string" || !senderDeviceId) {
+    throw new Error("The authenticated MLS sender device is missing.");
   }
+  if (typeof epoch !== "number" || !Number.isSafeInteger(epoch) || epoch < 0) {
+    throw new Error("The MLS epoch is missing or invalid.");
+  }
+
+  // All MLS writes go through the authorization RPC. Direct table inserts
+  // bypass the server's device, group, epoch and complete-recipient checks.
+  const { data: messageId, error } = await client.rpc("send_mls_message", {
+    p_conversation_id: conversationId,
+    p_device_id: senderDeviceId,
+    p_client_message_id: envelope.client_message_id,
+    p_ciphertext: envelope.ciphertext,
+    p_crypto_header: envelope.crypto_header,
+    p_epoch: epoch,
+    p_expires_at: envelope.expires_at ?? null,
+  });
   if (error) throw error;
+  if (typeof messageId !== "string" || !messageId) {
+    throw new Error("The MLS transport did not return a message ID.");
+  }
+
+  const { data, error: readError } = await client
+    .from("messages")
+    .select("id, conversation_id, sender_id, client_message_id, message_type, ciphertext, nonce, crypto_header, key_version, created_at, expires_at")
+    .eq("id", messageId)
+    .eq("conversation_id", conversationId)
+    .single();
+  if (readError) throw readError;
 
   // Push notifications contain only a generic alert and encrypted-message IDs.
   // The Edge Function never receives message plaintext or encryption keys.
