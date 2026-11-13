@@ -13,7 +13,10 @@ use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
 use serde::{Deserialize, Serialize};
 
-use crate::{mls_provider::ProtectedOpenMlsProvider, CoreError, CoreResult};
+use crate::{
+    mls_provider::ProtectedOpenMlsProvider, validate_message_content, CoreError, CoreResult,
+    MessageContent,
+};
 
 /// The mutually supported ChitChat MLS ciphersuite.
 pub const CHITCHAT_CIPHERSUITE: Ciphersuite =
@@ -217,6 +220,35 @@ impl MlsRuntime {
             .map_err(|_| CoreError::MlsOperationFailed)
     }
 
+    /// Validate and encrypt a versioned ChitChat text/media content payload.
+    ///
+    /// Media file keys belong inside this payload. They are protected by MLS
+    /// and must never be copied into Supabase metadata or a push payload.
+    pub fn encrypt_content(
+        &self,
+        group_id: &str,
+        content: &MessageContent,
+    ) -> CoreResult<Vec<u8>> {
+        validate_message_content(content)?;
+        let plaintext = serde_json::to_vec(content)
+            .map_err(|_| CoreError::InvalidMessageContent)?;
+        self.encrypt_application(group_id, &plaintext)
+    }
+
+    /// Decode and validate an authenticated ChitChat application payload.
+    ///
+    /// Call this only with bytes returned by process_incoming for an
+    /// Application event. The input must already have passed MLS authentication.
+    pub fn decode_application_content(bytes: &[u8]) -> CoreResult<MessageContent> {
+        if bytes.is_empty() || bytes.len() > MAX_WIRE_MESSAGE_BYTES {
+            return Err(CoreError::InvalidMessageContent);
+        }
+        let content: MessageContent =
+            serde_json::from_slice(bytes).map_err(|_| CoreError::InvalidMessageContent)?;
+        validate_message_content(&content)?;
+        Ok(content)
+    }
+
     /// Authenticate and process one inbound MLS wire message.
     ///
     /// Application messages are decrypted and returned. Commits are merged
@@ -401,12 +433,22 @@ mod tests {
         assert_eq!(joined_group_id, group_id);
         assert_eq!(bob.current_epoch(&joined_group_id).unwrap(), invite.epoch);
 
-        let message = "Hello from ChitChat 🔐".as_bytes();
-        let encrypted = alice.encrypt_application(&group_id, message).expect("encrypt application");
-        assert_ne!(encrypted, message);
+        let content = MessageContent {
+            version: 1,
+            blocks: vec![crate::MessageBlock::Text {
+                text: "Hello from ChitChat 🔐".into(),
+                concealed: false,
+            }],
+        };
+        let encrypted = alice.encrypt_content(&group_id, &content).expect("encrypt validated content");
+        assert_ne!(encrypted, serde_json::to_vec(&content).unwrap());
         let received = bob.process_incoming(&group_id, &encrypted, false).expect("decrypt application");
         assert_eq!(received.kind, MlsEventKind::Application);
-        assert_eq!(received.plaintext.as_deref(), Some(message.as_slice()));
+        let decoded = MlsRuntime::decode_application_content(
+            received.plaintext.as_deref().expect("application plaintext"),
+        )
+        .expect("decode validated ChitChat content");
+        assert_eq!(decoded, content);
 
         let prior_epoch = bob.current_epoch(&group_id).unwrap();
         let commit = bob.rotate_own_leaf(&group_id).expect("rotate Bob leaf");
@@ -446,7 +488,19 @@ mod tests {
 
         assert_eq!(runtime.create_group(&[]), Err(CoreError::MlsInvalidIdentity));
         assert_eq!(runtime.join_group(b"not a Welcome"), Err(CoreError::MlsInvalidWelcome));
-        assert_eq!(runtime.current_epoch("not-base64"), Err(CoreError::MlsInvalidGroupId));
+        assert_eq!(runtime.current_epoch("###"), Err(CoreError::MlsInvalidGroupId));
+        assert_eq!(
+            MlsRuntime::decode_application_content(b"{}"),
+            Err(CoreError::InvalidMessageContent)
+        );
+        let empty_content = MessageContent {
+            version: 1,
+            blocks: Vec::new(),
+        };
+        assert_eq!(
+            runtime.encrypt_content("unused-group", &empty_content),
+            Err(CoreError::InvalidMessageContent)
+        );
 
         clear_mls_storage_key().expect("clear test storage key");
     }
