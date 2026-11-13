@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, View
 } from "react-native";
+import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import type { ChitChatProfile } from "../../lib/supabase";
 import { supabase } from "../../lib/supabase";
 import { chitchatCore } from "../../native/chitchatCore";

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo, Animated, AppState, Pressable, StyleSheet, Text, View,
+  AccessibilityInfo, Animated, AppState, StyleSheet, Text, View,
 } from "react-native";
+import { MotionPressable as Pressable } from "./MotionPressable";
 import { palette, radius, spacing } from "../theme/tokens";
 
 type Props = {
