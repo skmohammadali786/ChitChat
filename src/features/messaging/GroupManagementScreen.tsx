@@ -9,7 +9,7 @@ import { palette, radius, spacing } from "../../theme/tokens";
 import { supabase } from "../../lib/supabase";
 import {
   loadGroupInvitations, loadGroupMembers, removeGroupMember, renameGroupConversation,
-  revokeGroupInvitation, sendGroupInvitation, setGroupMemberRole,
+  revokeGroupInvitation, sendGroupInvitation, setGroupMemberRole, subscribeToGroupInvitations,
   transferGroupOwnership, type GroupInvitation, type GroupMember
 } from "./groups";
 import { lookupProfileByUsername } from "./service";
@@ -60,6 +60,13 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
   }, [conversationId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    return subscribeToGroupInvitations(conversationId, () => {
+      void refresh();
+    });
+  }, [canManage, conversationId, refresh]);
 
   async function run(action: () => Promise<void>) {
     setError("");

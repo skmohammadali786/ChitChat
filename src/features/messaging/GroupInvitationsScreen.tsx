@@ -5,9 +5,11 @@ import {
 import { MotionPressable as Pressable } from "../../components/MotionPressable";
 import { Avatar } from "../../components/Avatar";
 import { palette, radius, spacing } from "../../theme/tokens";
+import { supabase } from "../../lib/supabase";
 import {
   loadMyGroupInvitations,
   respondToGroupInvitation,
+  subscribeToMyGroupInvitations,
   type MyGroupInvitation,
 } from "./groups";
 
@@ -33,7 +35,27 @@ export function GroupInvitationsScreen({ onBack, onAccepted }: Props) {
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    if (!supabase) return;
+    let stopped = false;
+    let unsubscribe: (() => void) | null = null;
+    void supabase.auth.getUser().then(({ data, error: authError }) => {
+      if (authError) throw authError;
+      if (!data.user) throw new Error("Sign in to receive group invitations.");
+      if (!stopped) {
+        unsubscribe = subscribeToMyGroupInvitations(data.user.id, () => {
+          void refresh();
+        });
+      }
+    }).catch(caught => {
+      if (!stopped) setError(caught instanceof Error ? caught.message : "Could not subscribe to group invitation updates.");
+    });
+    return () => {
+      stopped = true;
+      unsubscribe?.();
+    };
+  }, [refresh]);
 
   async function respond(item: MyGroupInvitation, accept: boolean) {
     if (busyId) return;

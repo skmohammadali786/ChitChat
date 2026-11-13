@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type GroupMember = {
   user_id: string;
@@ -154,4 +155,65 @@ export async function setGroupMemberRole(
     new_role: role,
   });
   if (error) throw error;
+}
+
+
+function subscribePrivateInvitationTopic(
+  topic: string,
+  event: string,
+  onUpdate: (payload: unknown) => void,
+  onStatus: (status: string) => void = () => undefined,
+): () => void {
+  const supabaseClient = client();
+  let stopped = false;
+  let channel: RealtimeChannel | null = null;
+
+  void supabaseClient.realtime.setAuth().then(() => {
+    if (stopped) return;
+    channel = supabaseClient
+      .channel(topic, { config: { private: true, broadcast: { self: false } } })
+      .on("broadcast", { event }, ({ payload }) => {
+        if (!stopped) onUpdate(payload);
+      });
+    channel.subscribe(status => {
+      if (!stopped) onStatus(status);
+    });
+  }).catch(() => {
+    if (!stopped) onStatus("CHANNEL_ERROR");
+  });
+
+  return () => {
+    stopped = true;
+    if (channel) void supabaseClient.removeChannel(channel);
+  };
+}
+
+/** Live invitation inbox events for the signed-in recipient only. */
+export function subscribeToMyGroupInvitations(
+  userId: string,
+  onUpdate: (payload: unknown) => void,
+  onStatus?: (status: string) => void,
+): () => void {
+  if (!userId) throw new Error("A signed-in user is required for group invitations.");
+  return subscribePrivateInvitationTopic(
+    `group-invitations:${userId}`,
+    "group-invitation-inbox-updated",
+    onUpdate,
+    onStatus,
+  );
+}
+
+/** Live pending-invitation events for owners/admins of one group. */
+export function subscribeToGroupInvitations(
+  conversationId: string,
+  onUpdate: (payload: unknown) => void,
+  onStatus?: (status: string) => void,
+): () => void {
+  if (!conversationId) throw new Error("A group is required for invitation updates.");
+  return subscribePrivateInvitationTopic(
+    `group-invitations-admin:${conversationId}`,
+    "group-invitation-admin-updated",
+    onUpdate,
+    onStatus,
+  );
 }
