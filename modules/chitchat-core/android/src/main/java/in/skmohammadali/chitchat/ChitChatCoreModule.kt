@@ -129,7 +129,7 @@ class ChitChatCoreModule : Module() {
       val bytes = context.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
         input.readBytes()
       } ?: throw IllegalArgumentException("The selected media file could not be opened.")
-      require(bytes.isNotEmpty() && bytes.size <= 50 * 1024 * 1024) { "Media must be between 1 byte and 50 MB." }
+      require(bytes.isNotEmpty() && bytes.size <= 50 * 1024 * 1024 - 16) { "Media must leave room for the authenticated-encryption tag within the 50 MB ciphertext limit." }
       val objectId = UUID.randomUUID().toString()
       requireBridge().encryptMediaAndWrap(
         groupId,
