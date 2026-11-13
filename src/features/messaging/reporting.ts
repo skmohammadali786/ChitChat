@@ -1,6 +1,6 @@
 import { supabase } from "../../lib/supabase";
 
-export type ConversationReportReason = "spam" | "harassment" | "impersonation" | "unsafe_content" | "other";
+export type ConversationReportReason = "spam" | "harassment" | "threats" | "nudity" | "impersonation" | "unsafe_content" | "other";
 
 function client() {
   if (!supabase) throw new Error("Supabase is not configured.");
