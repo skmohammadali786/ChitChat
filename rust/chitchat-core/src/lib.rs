@@ -9,6 +9,7 @@ mod message;
 mod media_crypto;
 mod device_identity;
 mod mls_storage;
+#[cfg(test)]
 mod mls_engine;
 mod profile;
 mod result;

@@ -34,6 +34,7 @@ export function DeviceManagementScreen({ onBack }: Props) {
       setItems(devices);
       if (chitchatCore.deviceIdentityAvailable) {
         const checks = await Promise.all(devices.map(async device => {
+          if (!device.fingerprint) return [device.id, null] as const;
           try {
             const bundle: DevicePublicBundle = {
               device_id: device.id,
@@ -42,12 +43,8 @@ export function DeviceManagementScreen({ onBack }: Props) {
               signed_prekey_public: device.signed_prekey_public,
               signed_prekey_signature: device.signed_prekey_signature,
               key_version: device.key_version,
-              fingerprint: "",
+              fingerprint: device.fingerprint,
             };
-            // The Rust verifier derives the fingerprint from keys. The native
-            // bridge accepts the empty display value only if it fills it from
-            // its returned verified result, so derive from registered public
-            // data in the native bridge instead of trusting a DB value.
             const verified = await chitchatCore.verifyDeviceBundle(bundle);
             return [device.id, verified] as const;
           } catch {

@@ -10,6 +10,7 @@ export type RegisteredDevice = {
   identity_key_public: string;
   signed_prekey_public: string;
   signed_prekey_signature: string;
+  fingerprint: string | null;
   key_version: number;
   created_at: string;
   last_seen_at: string;
@@ -32,7 +33,7 @@ export async function listMyDevices(): Promise<RegisteredDevice[]> {
   const userId = await currentUserId();
   const { data, error } = await client()
     .from("devices")
-    .select("id,user_id,device_label,platform,identity_key_public,signed_prekey_public,signed_prekey_signature,key_version,created_at,last_seen_at,revoked_at")
+    .select("id,user_id,device_label,platform,identity_key_public,signed_prekey_public,signed_prekey_signature,fingerprint,key_version,created_at,last_seen_at,revoked_at")
     .eq("user_id", userId)
     .is("revoked_at", null)
     .order("last_seen_at", { ascending: false });
@@ -53,10 +54,11 @@ export async function registerMyDevice(bundle: DevicePublicBundle): Promise<Regi
       identity_key_public: bundle.identity_key_public,
       signed_prekey_public: bundle.signed_prekey_public,
       signed_prekey_signature: bundle.signed_prekey_signature,
+      fingerprint: bundle.fingerprint,
       key_version: bundle.key_version,
       last_seen_at: new Date().toISOString(),
     })
-    .select("id,user_id,device_label,platform,identity_key_public,signed_prekey_public,signed_prekey_signature,key_version,created_at,last_seen_at,revoked_at")
+    .select("id,user_id,device_label,platform,identity_key_public,signed_prekey_public,signed_prekey_signature,fingerprint,key_version,created_at,last_seen_at,revoked_at")
     .single();
   if (error) {
     if (error.code === "23505") throw new Error("This device is already registered.");
