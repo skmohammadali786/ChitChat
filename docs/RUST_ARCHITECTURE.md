@@ -4,7 +4,7 @@
 - Android and iOS are first-class targets.
 - TypeScript owns the full UI, navigation, accessibility, animations, and supported Supabase client integration.
 - Rust owns portable domain validation, MLS protocol state, message/media encryption, serialization, and security-sensitive business rules.
-- OpenMLS 0.9.2 is selected for MLS (RFC 9420). It is not integrated yet. See [ADR 0001](adr/0001-e2ee-protocol-openmls.md).
+- OpenMLS 0.9.2 (RFC 9420) is integrated into the Rust crate with the RustCrypto provider and an encrypted SQLite storage provider. The app-level message API, Android/iOS native bridge, device key-package lifecycle, cross-platform tests, and review are not integrated yet. See [ADR 0001](adr/0001-e2ee-protocol-openmls.md).
 - A native bridge exposes a narrow API to React Native. Expo Go cannot load a custom Rust native module, so ChitChat requires a custom development build.
 
 ## Workspace
