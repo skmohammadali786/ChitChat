@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabase";
 import { validateEnvelopeWithRust } from "../../lib/rustCore";
+import { assertSecureMessagingAvailable } from "./cryptoGate";
 
 export type EncryptedMessageType = "text" | "image" | "video" | "audio" | "file";
 
@@ -171,6 +172,7 @@ export async function sendEncryptedMessage(
   conversationId: string,
   envelope: EncryptedMessageEnvelope
 ): Promise<EncryptedMessageRecord> {
+  assertSecureMessagingAvailable();
   validateEnvelope(envelope);
   // Rust validates the serialized envelope in custom native builds. This
   // remains a structural check only, never proof of end-to-end encryption.
