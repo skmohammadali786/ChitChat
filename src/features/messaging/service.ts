@@ -200,9 +200,13 @@ export async function sendEncryptedMessage(
 
   // All MLS writes go through the authorization RPC. Direct table inserts
   // bypass the server's device, group, epoch and complete-recipient checks.
+  if (envelope.crypto_header.message_type !== envelope.message_type) {
+    throw new Error("The MLS message type does not match its authenticated transport metadata.");
+  }
   const { data: messageId, error } = await client.rpc("send_mls_message", {
     p_conversation_id: conversationId,
     p_device_id: senderDeviceId,
+    p_message_type: envelope.message_type,
     p_client_message_id: envelope.client_message_id,
     p_ciphertext: envelope.ciphertext,
     p_crypto_header: envelope.crypto_header,
