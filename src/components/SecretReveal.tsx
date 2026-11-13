@@ -7,11 +7,22 @@ import { palette, radius, spacing } from "../theme/tokens";
 type Props = {
   text: string;
   autoReveal?: boolean;
+  dark?: boolean;
+  accentColor?: string;
   onReveal?: () => void;
   onHide?: () => void;
 };
 
-export function SecretReveal({ text, autoReveal = false, onReveal, onHide }: Props) {
+export function SecretReveal({ text, autoReveal = false, dark = false, accentColor = palette.brand, onReveal, onHide }: Props) {
+  const colors = {
+    hiddenBackground: dark ? "#29253C" : "#EDE9FF",
+    hiddenBorder: dark ? "#51477A" : "#DAD2FF",
+    hiddenTitle: dark ? "#E4DEFF" : "#453A91",
+    hiddenHint: dark ? "#B9AFE8" : "#776DB7",
+    revealedBackground: dark ? "#25213A" : "#F0ECFF",
+    revealedBorder: dark ? "#51477A" : "#DAD2FF",
+    secretText: dark ? "#F1EEFF" : "#282044",
+  };
   const [revealed, setRevealed] = useState(autoReveal);
   const [reduceMotion, setReduceMotion] = useState(false);
   const progress = useRef(new Animated.Value(autoReveal ? 1 : 0)).current;
@@ -59,12 +70,13 @@ export function SecretReveal({ text, autoReveal = false, onReveal, onHide }: Pro
           accessibilityRole="button"
           accessibilityLabel="Hide secret message"
           accessibilityHint="Conceals this message again"
+          accessibilityState={{ expanded: true }}
           hitSlop={8}
           onPress={hide}
         >
-          <Animated.View style={[styles.revealed, { opacity: progress, transform: [{ scale }] }]}>
-            <Text selectable style={styles.secretText}>{text}</Text>
-            <Text style={styles.helper}>Tap to hide again</Text>
+          <Animated.View style={[styles.revealed, { opacity: progress, transform: [{ scale }] }, { backgroundColor: colors.revealedBackground, borderColor: colors.revealedBorder }]}>
+            <Text selectable style={[styles.secretText, { color: colors.secretText }]}>{text}</Text>
+            <Text style={[styles.helper, { color: colors.hiddenHint }]}>Tap to hide again</Text>
           </Animated.View>
         </Pressable>
       ) : (
@@ -72,13 +84,14 @@ export function SecretReveal({ text, autoReveal = false, onReveal, onHide }: Pro
           accessibilityRole="button"
           accessibilityLabel="Reveal secret message"
           accessibilityHint="Shows the concealed message"
+          accessibilityState={{ expanded: false }}
           hitSlop={8}
           onPress={reveal}
-          style={styles.hidden}
+          style={[styles.hidden, { backgroundColor: colors.hiddenBackground, borderColor: colors.hiddenBorder }]}
         >
-          <Text style={styles.emoji}>✦  ✧  ✦</Text>
-          <Text style={styles.hiddenTitle}>A little secret</Text>
-          <Text style={styles.hiddenHint}>Tap to reveal</Text>
+          <Text style={[styles.emoji, { color: accentColor }]}>✦  ✧  ✦</Text>
+          <Text style={[styles.hiddenTitle, { color: colors.hiddenTitle }]}>A little secret</Text>
+          <Text style={[styles.hiddenHint, { color: colors.hiddenHint }]}>Tap to reveal</Text>
         </Pressable>
       )}
     </View>
