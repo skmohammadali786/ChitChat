@@ -152,3 +152,10 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 
 - Added a separate hidden-conversation inbox with restore controls. Per-user hidden state uses the existing `conversation_user_settings.hidden_at` field; delete semantics remain unimplemented.
 - Fixed an account-switching issue where demo/sample conversations could be merged into a signed-in inbox. Account-scoped UI state is reset on identity changes and the inbox now uses only the server-loaded conversation set.
+
+
+## Additional security boundary
+
+- Authenticated clients no longer have `INSERT` privileges on `public.messages` or `public.scheduled_messages`. Their old insert policies are removed. This closes the direct REST API bypass around the TypeScript crypto gate while the native MLS engine is unavailable.
+- Authenticated clients no longer have `UPDATE` privileges on scheduled-message rows. Cancellation is available only through `public.cancel_scheduled_message(uuid)`, which checks sender ownership and pending status. This prevents a client from rewriting scheduled ciphertext, timing or routing fields after insertion.
+- The scheduled-message manager remains useful for reading/cancelling any existing pending records. Creating new entries is intentionally disabled on the server until the MLS protocol is integrated.
