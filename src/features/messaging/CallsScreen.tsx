@@ -23,6 +23,7 @@ type ConversationOption = {
 type Props = {
   userId: string | null;
   conversations: ConversationOption[];
+  highlightCallId?: string | null;
 };
 
 function statusLabel(call: CallSession, userId: string | null): string {
@@ -35,7 +36,7 @@ function statusLabel(call: CallSession, userId: string | null): string {
   return "Ended";
 }
 
-export function CallsScreen({ userId, conversations }: Props) {
+export function CallsScreen({ userId, conversations, highlightCallId = null }: Props) {
   const [calls, setCalls] = useState<CallSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -62,6 +63,10 @@ export function CallsScreen({ userId, conversations }: Props) {
       setNotice("Incoming call request received. Voice and video media are not available in this build yet.");
     }, setRealtimeStatus);
   }, [refresh, userId]);
+
+  useEffect(() => {
+    if (highlightCallId) setNotice("Opened from an incoming-call notification. Check the call status below.");
+  }, [highlightCallId]);
 
   useEffect(() => {
     const activeCalls = calls.filter(call => call.status === "ringing" || call.status === "accepted");
@@ -137,7 +142,7 @@ export function CallsScreen({ userId, conversations }: Props) {
           const conversation = labelsByConversation.get(call.conversation_id);
           const label = conversation?.label ?? "ChitChat contact";
           return (
-            <View key={call.id} style={styles.card}>
+            <View key={call.id} style={[styles.card, call.id === highlightCallId && styles.highlighted]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{label}</Text>
                 <Text style={styles.cardMeta}>{call.call_type === "video" ? "Video" : "Audio"} request · {new Date(call.created_at).toLocaleString()}</Text>
@@ -220,6 +225,7 @@ const styles = StyleSheet.create({
   section: { color: palette.ink, fontSize: 13, fontWeight: "900", marginTop: spacing.lg, marginBottom: spacing.sm },
   emptyText: { color: palette.muted, fontSize: 11, lineHeight: 16 },
   card: { backgroundColor: palette.white, borderColor: palette.line, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  highlighted: { borderColor: palette.brand, borderWidth: 2 },
   cardTitle: { color: palette.ink, fontSize: 12, fontWeight: "800" },
   cardMeta: { color: palette.muted, fontSize: 10, marginTop: 3 },
   cardStatus: { color: palette.brand, fontSize: 10, fontWeight: "800", marginTop: 5 },

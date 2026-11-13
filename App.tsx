@@ -56,7 +56,7 @@ const seedMessages: Message[] = [
   { id: "m4", mine: true, text: "Now you have my attention.", time: "10:45" }
 ];
 
-function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; onNotificationHandled?: () => void }) {
+function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConversationId, openCallId, onNotificationHandled }: { profile?: ChitChatProfile | null; onSignOut?: () => void; onExitDemo?: () => void; onProfileUpdated?: (profile: ChitChatProfile) => void; openConversationId?: string | null; openCallId?: string | null; onNotificationHandled?: () => void }) {
   const [tab, setTab] = useState<"Chats" | "Calls" | "Settings">("Chats");
   const [conversationListMode, setConversationListMode] = useState<"inbox" | "archived" | "hidden">("inbox");
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -491,6 +491,12 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       if (presence) void presence.stop();
     };
   }, [profile?.id, activeChat?.conversationId, activeChat?.isReal, showOnlineStatus, showTypingStatus, showLastSeen]);
+
+  useEffect(() => {
+    if (!openCallId) return;
+    setTab("Calls");
+    onNotificationHandled?.();
+  }, [openCallId, onNotificationHandled]);
 
   useEffect(() => {
     if (!openConversationId) return;
@@ -1085,6 +1091,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         </>
       ) : tab === "Calls" ? (
         <CallsScreen
+          highlightCallId={openCallId}
           userId={profile?.id ?? null}
           conversations={chats
             .filter(chat => chat.isReal && !chat.isGroup && chat.conversationId && chat.remoteUserId)
@@ -1442,12 +1449,15 @@ export default function App() {
   const [demoMode, setDemoMode] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [notificationConversationId, setNotificationConversationId] = useState<string | null>(null);
+  const [notificationCallId, setNotificationCallId] = useState<string | null>(null);
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (!lastNotificationResponse) return;
     const data = lastNotificationResponse.notification.request.content.data;
-    if (typeof data?.conversation_id === "string") {
+    if (data?.type === "incoming_call" && typeof data.call_id === "string") {
+      setNotificationCallId(data.call_id);
+    } else if (typeof data?.conversation_id === "string") {
       setNotificationConversationId(data.conversation_id);
     }
     void Notifications.clearLastNotificationResponseAsync();
@@ -1558,5 +1568,5 @@ export default function App() {
   if (!session?.user) return <ScreenTransition key="authentication"><AuthScreen onContinueDemo={() => setDemoMode(true)} /></ScreenTransition>;
   if (profileError) return <AuthProblemScreen message={profileError} onSignOut={() => { void signOut(); }} />;
   if (!profile) return <ScreenTransition key="profile-setup"><ProfileSetupScreen user={session.user} onSaved={setProfile} onSignOut={() => { void signOut(); }} /></ScreenTransition>;
-  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} onNotificationHandled={() => setNotificationConversationId(null)} />
+  return <MainApp profile={profile} onProfileUpdated={setProfile} onSignOut={() => { void signOut(); }} openConversationId={notificationConversationId} openCallId={notificationCallId} onNotificationHandled={() => { setNotificationConversationId(null); setNotificationCallId(null); }} />
 }

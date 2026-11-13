@@ -104,6 +104,17 @@ export async function createCallSession(
     }
     throw error;
   }
+  // Realtime handles foreground devices. This generic push wakes devices
+  // whose app is backgrounded or terminated. Push failure must not cancel
+  // an otherwise valid ringing session.
+  void client().functions.invoke("notify-call", {
+    body: { call_id: data },
+  }).then(({ error: pushError }) => {
+    if (pushError) console.warn("ChitChat incoming-call notification failed.", pushError.message);
+  }).catch(error => {
+    console.warn("ChitChat incoming-call notification request failed.", error);
+  });
+
   return data;
 }
 
