@@ -79,8 +79,8 @@ Legend:
 |---|---|---|
 | Block/unblock | PARTIAL | Block list and unblock UI exist; direct conversations are hidden, direct message inserts are rejected, group creation/add checks both directions, and push delivery excludes blocked relationships. Multi-user acceptance tests and group-specific block semantics remain |
 | Report message/user | PARTIAL | Direct-account and group report actions call a private, membership-checked RPC with reason validation and a five-per-hour account limit; message-specific report action, reviewer console, moderation access controls and triage workflow remain |
-| App lock | PARTIAL | Synced preference fields exist; native lock screen and lifecycle enforcement remain |
-| Biometric unlock | NOT STARTED | Native biometric prompt on Android/iOS |
+| App lock | PARTIAL | Native device-authentication lock screen is wired through Expo LocalAuthentication and locks when the app leaves the foreground; physical Android/iOS lifecycle and lockout testing remain |
+| Biometric unlock | PARTIAL | Uses the OS biometric prompt with device PIN/passcode fallback on Android/iOS; hardware enrollment and real-device failure/lockout testing remain |
 | Notification privacy | PARTIAL | User can disable alerts or show sender only; push payloads never include message text. Device lock-screen behavior and push delivery tests remain |
 | Last seen/read receipts privacy | PARTIAL | Read receipt, online, typing and last-seen controls are wired to Supabase; read receipt UI and cross-device tests remain |
 | Contact permissions | NOT STARTED | Optional OS permission and privacy-safe discovery |
