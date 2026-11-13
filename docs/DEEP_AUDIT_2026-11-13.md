@@ -20,7 +20,7 @@ A feature is verified only when the UI, native logic, backend authorization, err
 6. Media metadata and the authenticated R2 Worker exist, but there is no native picker-to-Rust-encryption-to-R2-upload-to-authorized-download-to-Rust-decryption flow.
 7. Group creation and member administration exist. Encrypted group messaging, invitation acceptance, device membership changes, and MLS epoch/key rotation do not.
 8. Receipt and reaction services/database support exist, but the active chat does not display messages, receipts, or reactions and does not subscribe to receipt/reaction changes.
-9. Presence is wired for an active conversation, but there is no message composer event path to emit typing state. Receipt subscriptions currently create a channel with the same topic as presence/message subscriptions; consolidate these into one conversation channel before enabling them together.
+9. Presence is wired for an active conversation. The composer now emits outgoing typing broadcasts while the user types and clears them after 1.6 seconds, send, blur or route cleanup. Receipt subscriptions still create a channel with the same topic as presence/message subscriptions; consolidate these into one conversation channel before enabling them together.
 10. The Calls tab is explicitly a placeholder. Voice/video calling is not implemented.
 11. Settings now expose system/light/dark appearance, six accent palette choices, auto-reveal, push enablement, discovery, block list, sender-only/off notification previews, read-receipt/online/typing/last-seen privacy, and app lock. All-screen accent consistency, real-device lock tests, and contact discovery remain incomplete.
 12. The build has no committed `package-lock.json`. CI uses `npm install`, so dependency resolution is not reproducible.
@@ -171,3 +171,8 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 - App lock now tracks React Native `AppState` and invokes the OS authentication prompt when the app returns to active state. Real-device tests still remain.
 
 - Secret reveal now uses the selected theme/accent, hides when auto-reveal is switched off, automatically re-hides when the app leaves the foreground, and disables text selection for concealed content. JavaScript string memory is not guaranteed to be zeroized and platform capture prevention is not implemented.
+
+
+## Follow-up implementation after the 2026-11-13 audit
+
+- Wired outgoing typing broadcasts into the active real-conversation composer. Typing state clears after 1.6 seconds of inactivity, on send, on input blur, and when the conversation route is cleaned up. The existing privacy setting still suppresses typing broadcasts when disabled. Physical multi-account Realtime tests remain outstanding.

@@ -113,3 +113,7 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - App lock triggers the native authentication prompt on foreground resume; device validation remains pending.
 
 - Concealed demo text is non-selectable, re-hides when the app leaves the foreground, and hides when the user disables auto-reveal. This is not secure memory zeroization and does not prevent all screenshots or screen recordings.
+
+
+## Latest follow-up
+- Outgoing typing broadcasts are now wired to the real-conversation composer and stop on inactivity, send, blur, or route cleanup. This is source-level implementation only; multi-account Realtime/device verification is still required.
