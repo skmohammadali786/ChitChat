@@ -109,13 +109,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         .map(block => block.text).join("\\n");
       const media = blocks.find((block): block is Extract<MessageContentBlock, { type: "media" }> => block.type === "media");
       let mediaUri: string | undefined;
+      let renderedText = text;
       if (media) {
-        mediaUri = await getDecryptedMediaUri(media.object_id, JSON.stringify(content), media.object_id, media.media_kind);
+        try {
+          mediaUri = await getDecryptedMediaUri(media.object_id, JSON.stringify(content), media.object_id, media.media_kind);
+        } catch (error) {
+          console.warn("ChitChat authenticated a media message but could not open its attachment.", error);
+          if (!renderedText) renderedText = "Encrypted attachment could not be opened";
+        }
       }
       return {
         id: record.id,
         mine: record.sender_id === profile?.id,
-        text,
+        text: renderedText,
         time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         secret: blocks.some(block => block.concealed === true),
         mediaUri,
@@ -152,7 +158,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           return { ...current, [activeChat.id]: [...existing, message] };
         });
       }).catch(() => {
-        if (!cancelled) setRealMessageError("A new message failed MLS authentication or group synchronization and was not displayed.");
+        if (!cancelled) setRealMessageError("A new message failed MLS authentication, group synchronization, or attachment decryption.");
       });
     }, status => {
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
