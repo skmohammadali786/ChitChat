@@ -1,13 +1,17 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { radius } from "../theme/tokens";
 
-type Props = { initials: string; color: string; size?: number; online?: boolean };
-export function Avatar({ initials, color, size = 52, online = false }: Props) {
+type Props = { initials: string; color: string; size?: number; online?: boolean; uri?: string | null };
+export function Avatar({ initials, color, size = 52, online = false, uri }: Props) {
   return (
     <View style={{ width: size, height: size }}>
       <View style={[styles.avatar, { width: size, height: size, backgroundColor: color, borderRadius: size / 2 }]}>
-        <Text style={{ color: "#252938", fontSize: size * 0.31, fontWeight: "700" }}>{initials}</Text>
+        {uri ? (
+          <Image source={{ uri }} resizeMode="cover" style={{ width: size, height: size, borderRadius: size / 2 }} />
+        ) : (
+          <Text style={{ color: "#252938", fontSize: size * 0.31, fontWeight: "700" }}>{initials}</Text>
+        )}
       </View>
       {online ? <View style={[styles.online, { right: 0, bottom: 0 }]} /> : null}
     </View>

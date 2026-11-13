@@ -9,6 +9,7 @@ import {
 import { MotionPressable as Pressable } from "./src/components/MotionPressable";
 import { AnimatedSafeAreaView, ScreenTransition } from "./src/components/ScreenTransition";
 import { Avatar } from "./src/components/Avatar";
+import { EncryptedAvatar } from "./src/components/EncryptedAvatar";
 import { SecretReveal } from "./src/components/SecretReveal";
 import { accentPalettes, palette, radius, spacing, typeScale } from "./src/theme/tokens";
 import type { Session } from "@supabase/supabase-js";
@@ -37,7 +38,7 @@ import { loadPreferences, savePreference, type AccentPalette } from "./src/lib/p
 import { loadConversationSettings, loadUserSettings, saveConversationSettings, saveUserSettings, type ConversationSettings } from "./src/features/settings/userSettings";
 import { disablePushNotifications, enablePushNotifications, listenForPushTokenChanges, revokeCurrentPushRegistration, syncPushRegistrationIfGranted } from "./src/features/notifications/registration";
 
-type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string; pinnedAt?: string | null; mutedUntil?: string | null; archivedAt?: string | null; hiddenAt?: string | null };
+type Chat = { id: string; name: string; initials: string; color: string; message: string; time: string; unread: number; online?: boolean; secret?: boolean; isReal?: boolean; isGroup?: boolean; conversationId?: string; remoteUserId?: string; avatarPath?: string | null; pinnedAt?: string | null; mutedUntil?: string | null; archivedAt?: string | null; hiddenAt?: string | null };
 type Message = { id: string; mine: boolean; text: string; time: string; secret?: boolean };
 
 const initialChats: Chat[] = [
@@ -447,6 +448,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           conversationId: row.conversation_id,
           isGroup: row.conversation_kind === "group",
           remoteUserId: row.other_user_id ?? undefined,
+          avatarPath: row.other_avatar_path ?? null,
           pinnedAt: preference?.pinned_at ?? null,
           mutedUntil: preference?.muted_until ?? null,
           archivedAt: preference?.archived_at ?? null,
@@ -1046,7 +1048,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
                 }}
                 style={styles.chatRow}
               >
-                <Avatar initials={item.initials} color={item.color} online={item.online} />
+                <EncryptedAvatar initials={item.initials} color={item.color} size={52} online={item.online} mediaId={item.avatarPath} />
                 <View style={styles.chatDetails}>
                   <View style={styles.chatTop}>
                     <Text style={[styles.chatName, { color: c.text }]}>{item.name}</Text>
@@ -1115,7 +1117,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           {profile ? (
             <View style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.xl }]}>
               <Pressable accessibilityRole="button" onPress={() => setShowProfileEditor(true)} style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
-                <Avatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" />
+                <EncryptedAvatar initials={profile.display_name.split(" ").map(part => part[0]).join("").slice(0, 2).toUpperCase()} color="#D8D1FF" mediaId={profile.avatar_path} />
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={[styles.settingTitle, { color: c.text }]}>{profile.display_name}</Text>
                   <Text style={[styles.settingHint, { color: c.muted }]}>@{profile.username}</Text>

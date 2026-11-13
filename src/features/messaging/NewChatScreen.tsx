@@ -4,7 +4,7 @@ import {
   Text, TextInput, View
 } from "react-native";
 import { MotionPressable as Pressable } from "../../components/MotionPressable";
-import { Avatar } from "../../components/Avatar";
+import { EncryptedAvatar } from "../../components/EncryptedAvatar";
 import { palette, radius, spacing, typeScale } from "../../theme/tokens";
 import { createDirectConversation, lookupProfileByUsername, type DiscoverableProfile } from "./service";
 
@@ -116,7 +116,7 @@ export function NewChatScreen({ hasAccount, onBack, onSignIn, onConversationCrea
 
           {result ? (
             <View style={styles.profileCard}>
-              <Avatar initials={initials} color="#D8D1FF" size={58} />
+              <EncryptedAvatar initials={initials} color="#D8D1FF" size={58} mediaId={result.avatar_path} />
               <View style={styles.profileCopy}>
                 <Text style={styles.profileName}>{result.display_name}</Text>
                 <Text style={styles.profileUsername}>@{result.username}</Text>

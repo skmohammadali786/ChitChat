@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, View
 } from "react-native";
 import { MotionPressable as Pressable } from "../../components/MotionPressable";
-import { Avatar } from "../../components/Avatar";
+import { EncryptedAvatar } from "../../components/EncryptedAvatar";
 import { palette, radius, spacing } from "../../theme/tokens";
 import { supabase } from "../../lib/supabase";
 import {
@@ -224,7 +224,7 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
               const canRemove = canLeave || (!self && canManage && member.member_role !== "owner");
               return (
                 <View key={member.user_id} style={styles.memberRow}>
-                  <Avatar initials={initials || "CH"} color="#D8D1FF" size={42} />
+                  <EncryptedAvatar initials={initials || "CH"} color="#D8D1FF" size={42} mediaId={member.avatar_path} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.memberName}>{name}{self ? " (you)" : ""}</Text>
                     <Text style={styles.memberUsername}>{member.username ? `@${member.username} · ` : ""}{member.member_role}</Text>

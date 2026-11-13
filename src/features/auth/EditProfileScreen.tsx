@@ -4,6 +4,9 @@ import {
   StyleSheet, Text, TextInput, View
 } from "react-native";
 import { MotionPressable as Pressable } from "../../components/MotionPressable";
+import { EncryptedAvatar } from "../../components/EncryptedAvatar";
+import { pickAvatarImage } from "../messaging/mediaPicker";
+import { encryptAndUploadAvatar } from "../messaging/mediaService";
 import type { ChitChatProfile } from "../../lib/supabase";
 import { supabase } from "../../lib/supabase";
 import { chitchatCore } from "../../native/chitchatCore";
@@ -21,7 +24,33 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
   const [bio, setBio] = useState(profile.bio ?? "");
   const [discoverable, setDiscoverable] = useState(profile.discoverable);
   const [busy, setBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [error, setError] = useState("");
+
+  async function changeAvatar() {
+    setError("");
+    setAvatarBusy(true);
+    try {
+      const selected = await pickAvatarImage();
+      if (!selected) return;
+      if (!chitchatCore.avatarCryptoAvailable) {
+        throw new Error("The Rust avatar encryption and protected Keychain/Keystore bridge are not linked in this build. The photo was not uploaded.");
+      }
+      await encryptAndUploadAvatar(selected.uri);
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,username,display_name,bio,avatar_path,discoverable")
+        .eq("id", profile.id)
+        .single();
+      if (profileError) throw profileError;
+      onSaved(data as ChitChatProfile);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update the encrypted avatar.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   async function save() {
     setError("");
@@ -99,11 +128,18 @@ export function EditProfileScreen({ profile, onBack, onSaved }: Props) {
           </View>
         </View>
 
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {displayName.trim().split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "CH"}
-          </Text>
-        </View>
+        <EncryptedAvatar
+          initials={displayName.trim().split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "CH"}
+          color="#D8D1FF"
+          size={72}
+          mediaId={profile.avatar_path}
+        />
+        <Pressable accessibilityRole="button" disabled={avatarBusy || busy} onPress={() => void changeAvatar()} style={[styles.avatarAction, (avatarBusy || busy) && styles.disabled]}>
+          {avatarBusy ? <ActivityIndicator color={palette.brand} size="small" /> : <Text style={styles.avatarActionText}>Change encrypted avatar</Text>}
+        </Pressable>
+        <Text style={styles.avatarHint}>
+          Your original photo is encrypted on this device before it is sent to private storage.
+        </Text>
         <Text style={styles.eyebrow}>YOUR PROFILE</Text>
         <Text style={styles.title}>Make it yours.</Text>
         <Text style={styles.description}>Your email address is never shown in username discovery.</Text>
@@ -150,8 +186,9 @@ const styles = StyleSheet.create({
   backText: { color: palette.ink, fontSize: 30, lineHeight: 34 },
   headerTitle: { color: palette.ink, fontSize: 17, fontWeight: "800" },
   headerSubtitle: { color: palette.muted, fontSize: 11, marginTop: 2 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#D8D1FF", alignItems: "center", justifyContent: "center", marginBottom: spacing.lg },
-  avatarText: { color: "#453A91", fontSize: 20, fontWeight: "900" },
+  avatarAction: { minHeight: 38, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: "#EEEAFE", marginTop: spacing.sm },
+  avatarActionText: { color: palette.brand, fontSize: 11, fontWeight: "800" },
+  avatarHint: { color: palette.muted, fontSize: 10, lineHeight: 15, marginTop: 6, marginBottom: spacing.md },
   eyebrow: { color: palette.brand, fontSize: 10, fontWeight: "800", letterSpacing: 1.4 },
   title: { color: palette.ink, fontSize: typeScale.display, fontWeight: "900", letterSpacing: -1, marginTop: spacing.sm },
   description: { color: palette.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.sm, marginBottom: spacing.lg },
