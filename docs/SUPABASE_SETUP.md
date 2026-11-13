@@ -50,3 +50,8 @@ The current live project also contains these later migrations, and the repositor
 - `20261113032954_disable_unverified_message_writes.sql`
 
 The last migration intentionally removes authenticated client INSERT from `messages` and `scheduled_messages` until the MLS implementation is available. Do not restore those grants as a UI-only change.
+
+- `20261113033402_validate_message_report_submission.sql`
+- `20261113033634_serialize_report_rate_limits.sql`
+
+Report submission uses a transaction-scoped per-reporter advisory lock. This serializes both message and conversation reports so concurrent submissions cannot race past the shared five-per-hour limit.
