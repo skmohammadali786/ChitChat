@@ -171,6 +171,44 @@ impl MlsRuntime {
         })
     }
 
+    /// Remove a member by its MLS leaf index.
+    ///
+    /// The caller must map the requested account/device to a leaf index using
+    /// the authenticated MLS roster and independently verify that the current
+    /// group role permits removal. This method refuses to remove the local
+    /// device. The removal Commit is merged locally before it is returned.
+    pub fn remove_member(
+        &self,
+        group_id: &str,
+        member_leaf_index: u32,
+    ) -> CoreResult<MlsRemoveMemberResult> {
+        let mut group = load_group(&self.provider, group_id)?;
+        let target = LeafNodeIndex::new(member_leaf_index);
+
+        if target == group.own_leaf_index() {
+            return Err(CoreError::MlsCannotRemoveSelf);
+        }
+        if group.member_at(target).is_none() {
+            return Err(CoreError::MlsMemberNotFound);
+        }
+
+        let signer = group_signer(&self.provider, &group)?;
+        let (commit, _welcome, _group_info) = group
+            .remove_members(&self.provider, &signer, &[target])
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        let wire_bytes = commit
+            .to_bytes()
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+        group
+            .merge_pending_commit(&self.provider)
+            .map_err(|_| CoreError::MlsOperationFailed)?;
+
+        Ok(MlsRemoveMemberResult {
+            commit: wire_bytes,
+            epoch: group.epoch().as_u64(),
+        })
+    }
+
     /// Join a group from a Welcome addressed to this device's stored KeyPackage.
     pub fn join_group(&self, welcome_bytes: &[u8]) -> CoreResult<String> {
         if welcome_bytes.is_empty() || welcome_bytes.len() > MAX_WIRE_MESSAGE_BYTES {
@@ -272,6 +310,16 @@ impl MlsRuntime {
         let protocol_message = incoming
             .try_into_protocol_message()
             .map_err(|_| CoreError::MlsInvalidWireMessage)?;
+
+        // Reject control messages before handing them to OpenMLS. This avoids
+        // advancing receive state for a commit or proposal that this caller
+        // has not authorized against the server-side group roster.
+        if !allow_control_messages
+            && protocol_message.content_type() != ContentType::Application
+        {
+            return Err(CoreError::MlsControlMessageRequiresApproval);
+        }
+
         let processed = group
             .process_message(&self.provider, protocol_message)
             .map_err(|_| CoreError::MlsOperationFailed)?;
