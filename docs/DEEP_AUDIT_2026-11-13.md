@@ -148,3 +148,7 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 
 
 - Added device-authentication app lock using Expo LocalAuthentication. The app requires an enrolled device credential before enabling the setting, locks when the app leaves the foreground, and gates the signed-in UI until successful authentication. Android/iOS device and lifecycle tests are still pending.
+
+
+- Added a separate hidden-conversation inbox with restore controls. Per-user hidden state uses the existing `conversation_user_settings.hidden_at` field; delete semantics remain unimplemented.
+- Fixed an account-switching issue where demo/sample conversations could be merged into a signed-in inbox. Account-scoped UI state is reset on identity changes and the inbox now uses only the server-loaded conversation set.
