@@ -92,6 +92,8 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [appLockError, setAppLockError] = useState("");
   const appLockAuthInProgressRef = useRef(false);
   const pushSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const presenceRef = useRef<ReturnType<typeof subscribeToConversationPresence> | null>(null);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const c = dark ? {
     bg: palette.darkBg, surface: palette.darkSurface, raised: palette.darkRaised,
     text: palette.darkText, muted: palette.darkMuted, line: palette.darkLine
@@ -421,10 +423,14 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         typing => setTypingUserId(typing.typing ? typing.userId : null),
         { showOnlineStatus, showTypingStatus, showLastSeen },
       );
+      presenceRef.current = presence;
     });
     return () => {
       active = false;
       setTypingUserId(null);
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+      presenceRef.current = null;
       if (presence) void presence.stop();
     };
   }, [profile?.id, activeChat?.conversationId, activeChat?.isReal, showOnlineStatus, showTypingStatus, showLastSeen]);
@@ -550,7 +556,27 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     );
   }
 
+  function handleDraftChange(value: string) {
+    setDraft(value);
+    if (!activeChat?.isReal || !presenceRef.current) return;
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    void presenceRef.current.setTyping(Boolean(value.trim())).catch(error => {
+      console.warn("Could not publish typing state.", error);
+    });
+    if (value.trim()) {
+      typingStopTimerRef.current = setTimeout(() => {
+        typingStopTimerRef.current = null;
+        void presenceRef.current?.setTyping(false).catch(error => {
+          console.warn("Could not clear typing state.", error);
+        });
+      }, 1600);
+    }
+  }
+
   function sendMessage() {
+    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+    typingStopTimerRef.current = null;
+    void presenceRef.current?.setTyping(false).catch(() => undefined);
     const value = draft.trim();
     if (!value || !activeChat || activeChat.isReal) return;
     const sentAt = new Date().toISOString();
@@ -809,7 +835,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
               >
                 <Text style={[styles.secretToggleText, draftSecret && styles.secretToggleTextOn]}>✦</Text>
               </Pressable>
-              <TextInput value={draft} onChangeText={setDraft} placeholder={draftSecret ? "Write a secret message..." : "Write a message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
+              <TextInput value={draft} onChangeText={handleDraftChange} onBlur={() => { if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current); typingStopTimerRef.current = null; void presenceRef.current?.setTyping(false).catch(() => undefined); }} placeholder={draftSecret ? "Write a secret message..." : "Write a message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
               <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={!draft.trim()} onPress={sendMessage} style={[styles.sendButton, !draft.trim() && { opacity: 0.55 }]}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
             </View>
           )}
