@@ -141,9 +141,9 @@ public final class ChitChatCoreModule: Module {
       let accessed = fileURL.startAccessingSecurityScopedResource()
       defer { if accessed { fileURL.stopAccessingSecurityScopedResource() } }
       let plaintext = try Data(contentsOf: fileURL, options: [.mappedIfSafe])
-      guard !plaintext.isEmpty && plaintext.count <= 50 * 1024 * 1024 else {
+      guard !plaintext.isEmpty && plaintext.count <= 50 * 1024 * 1024 - 16 else {
         throw NSError(domain: "ChitChatMedia", code: 4, userInfo: [
-          NSLocalizedDescriptionKey: "Media must be between 1 byte and 50 MB.",
+          NSLocalizedDescriptionKey: "Media must leave room for the authenticated-encryption tag within the 50 MB ciphertext limit.",
         ])
       }
       try self.requireBridge().encryptMediaAndWrap(
