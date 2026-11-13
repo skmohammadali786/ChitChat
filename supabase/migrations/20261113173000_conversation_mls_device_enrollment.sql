@@ -126,14 +126,14 @@ begin
    where md.conversation_id=p_conversation_id and md.user_id=v_me and md.status='active' and d.revoked_at is null)
  then raise exception 'active_mls_admin_device_required'; end if;
  return query
- select d.id,d.user_id,kp.package_id,kp.key_package
+ select distinct on (d.id) d.id,d.user_id,kp.package_id,kp.key_package
  from public.conversation_members cm
  join public.devices d on d.user_id=cm.user_id and d.revoked_at is null
  join public.mls_key_packages kp on kp.device_id=d.id and kp.user_id=d.user_id and kp.expires_at>now()
  where cm.conversation_id=p_conversation_id
    and not exists(select 1 from public.conversation_mls_devices md
      where md.conversation_id=p_conversation_id and md.device_id=d.id and md.status='active')
- order by cm.joined_at,d.created_at,kp.created_at;
+ order by d.id,kp.created_at desc;
 end;
 $$;
 revoke all on function private.list_missing_mls_devices_impl(uuid) from public,anon,authenticated;
@@ -168,19 +168,27 @@ begin
  where g.conversation_id=p_conversation_id and g.status='active' for update;
  if not found then raise exception 'active_mls_group_required'; end if;
 
- if v_group.epoch=p_epoch and exists(select 1 from public.conversation_mls_commits c
+ if not exists(select 1 from public.conversation_members cm where cm.conversation_id=p_conversation_id and cm.user_id=v_me and cm.role in ('owner','admin'))
+ then raise exception 'mls_group_admin_required'; end if;
+ if not exists(select 1 from public.conversation_mls_devices md join public.devices sd on sd.id=md.device_id
+   where md.conversation_id=p_conversation_id and md.device_id=p_sender_device_id and md.user_id=v_me
+     and md.status='active' and sd.revoked_at is null)
+ then raise exception 'active_mls_sender_device_required'; end if;
+
+ if v_group.epoch=p_epoch and exists(
+   select 1 from public.conversation_mls_commits c
+   join public.mls_group_welcomes w on w.conversation_id=c.conversation_id and w.sender_device_id=c.sender_device_id
    where c.conversation_id=p_conversation_id and c.epoch=p_epoch and c.sender_device_id=p_sender_device_id
-   and c.commit_message=p_commit_message)
+     and c.commit_message=p_commit_message and w.target_device_id=p_target_device_id
+     and w.welcome_message=p_welcome_message
+ )
  then
-   select d.user_id into v_target_user from public.devices d where d.id=p_target_device_id;
    select c.id into v_commit_id from public.conversation_mls_commits c
      where c.conversation_id=p_conversation_id and c.epoch=p_epoch;
    return v_commit_id;
  end if;
 
  if v_group.epoch is distinct from p_previous_epoch then raise exception 'mls_group_epoch_conflict'; end if;
- if not exists(select 1 from public.conversation_members cm where cm.conversation_id=p_conversation_id and cm.user_id=v_me and cm.role in ('owner','admin'))
- then raise exception 'mls_group_admin_required'; end if;
  if not exists(select 1 from public.conversation_mls_devices md join public.devices sd on sd.id=md.device_id
    where md.conversation_id=p_conversation_id and md.device_id=p_sender_device_id and md.user_id=v_me
      and md.status='active' and sd.revoked_at is null)
