@@ -16,6 +16,7 @@ import { NewChatScreen } from "./src/features/messaging/NewChatScreen";
 import { GroupCreationScreen } from "./src/features/messaging/GroupCreationScreen";
 import { GroupManagementScreen } from "./src/features/messaging/GroupManagementScreen";
 import { BlockedUsersScreen } from "./src/features/messaging/BlockedUsersScreen";
+import { ScheduledMessagesScreen } from "./src/features/messaging/ScheduledMessagesScreen";
 import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { completeAuthFromUrl } from "./src/features/auth/deepLinks";
@@ -51,6 +52,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [showGroupCreation, setShowGroupCreation] = useState(false);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
+  const [showScheduledMessages, setShowScheduledMessages] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [conversationLoadError, setConversationLoadError] = useState("");
   const [discoveryEnabled, setDiscoveryEnabled] = useState(profile?.discoverable ?? false);
@@ -452,6 +454,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     );
   }
 
+  if (showScheduledMessages && profile) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
+        <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+        <ScheduledMessagesScreen
+          dark={dark}
+          accentColor={accentColor}
+          onBack={() => setShowScheduledMessages(false)}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (showProfileEditor && profile) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
@@ -758,6 +773,15 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
               <View style={styles.settingCopy}>
                 <Text style={[styles.settingTitle, { color: c.text }]}>Create a group</Text>
                 <Text style={[styles.settingHint, { color: c.muted }]}>Start a group conversation with discoverable users.</Text>
+              </View>
+              <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
+            </Pressable>
+          ) : null}
+          {profile ? (
+            <Pressable accessibilityRole="button" onPress={() => setShowScheduledMessages(true)} style={[styles.settingCard, { backgroundColor: c.surface, marginBottom: spacing.md }]}>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: c.text }]}>Scheduled messages</Text>
+                <Text style={[styles.settingHint, { color: c.muted }]}>Review or cancel pending scheduled sends.</Text>
               </View>
               <Text style={{ color: c.muted, fontSize: 22 }}>›</Text>
             </Pressable>
