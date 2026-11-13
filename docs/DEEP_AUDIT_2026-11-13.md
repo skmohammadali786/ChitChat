@@ -169,3 +169,5 @@ Do not merge PR #1 or call an APK complete until all release-critical checks pas
 - Added `ReportConversationModal` with seven report categories, optional 1,000-character context, busy/error states and a private submit flow from direct/group chat actions.
 - Corrected the moderation schema/RPC mismatch. The live `private.message_reports` table now accepts exactly the reason values supported by the private RPCs and caps details at 1,000 characters. The client mirrors that limit.
 - App lock now tracks React Native `AppState` and invokes the OS authentication prompt when the app returns to active state. Real-device tests still remain.
+
+- Secret reveal now uses the selected theme/accent, hides when auto-reveal is switched off, automatically re-hides when the app leaves the foreground, and disables text selection for concealed content. JavaScript string memory is not guaranteed to be zeroized and platform capture prevention is not implemented.
