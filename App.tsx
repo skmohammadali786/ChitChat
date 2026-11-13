@@ -122,7 +122,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         mediaKind: media?.media_kind,
       };
     };
-    void loadDecryptedMlsHistory(conversationId, 100).then(result => {
+    void loadDecryptedMlsHistory(conversationId, 100).then(async result => {
       if (cancelled) return;
       const rendered = await Promise.all(result.messages.map(item => toUiMessage(item.record, item.content)));
       if (cancelled) return;
@@ -143,7 +143,7 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
       void decryptMlsMessage(record).catch(async () => {
         await syncConversationMlsGroup(conversationId);
         return decryptMlsMessage(record);
-      }).then(content => {
+      }).then(async content => {
         if (cancelled) return;
         const message = await toUiMessage(record, content);
         setRealMessagesByChat(current => {
