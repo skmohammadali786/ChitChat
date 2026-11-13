@@ -28,7 +28,8 @@ import { DeviceManagementScreen } from "./src/features/security/DeviceManagement
 import { DeviceVerificationScreen } from "./src/features/security/DeviceVerificationScreen";
 import { ReportConversationModal } from "./src/features/messaging/ReportConversationModal";
 import { authenticateForAppLock } from "./src/features/security/appLock";
-import { blockUser, loadMyConversations, type DiscoverableProfile } from "./src/features/messaging/service";
+import { blockUser, loadMyConversations, subscribeToEncryptedMessages, type DiscoverableProfile, type EncryptedMessageRecord } from "./src/features/messaging/service";
+import { decryptMlsMessage, loadDecryptedMlsHistory, sendMlsTextMessage } from "./src/features/messaging/mlsTransport";
 import { subscribeToConversationPresence } from "./src/features/messaging/presence";
 import { flushPendingEncryptedMessages } from "./src/features/messaging/delivery";
 import { listPendingEncryptedMessages } from "./src/features/messaging/outbox";
@@ -83,7 +84,69 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
   const [draft, setDraft] = useState("");
   const [draftSecret, setDraftSecret] = useState(false);
   const [demoMessagesByChat, setDemoMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [realMessagesByChat, setRealMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [realMessageLoading, setRealMessageLoading] = useState(false);
+  const [realMessageError, setRealMessageError] = useState("");
   const activeMessages = activeChat ? (demoMessagesByChat[activeChat.id] ?? seedMessages) : seedMessages;
+  const activeRealMessages = activeChat ? (realMessagesByChat[activeChat.id] ?? []) : [];
+  useEffect(() => {
+    const conversationId = activeChat?.conversationId;
+    if (!activeChat?.isReal || !conversationId) {
+      setRealMessageLoading(false);
+      setRealMessageError("");
+      return;
+    }
+    let cancelled = false;
+    setRealMessageLoading(true);
+    setRealMessageError("");
+    const toUiMessage = (record: EncryptedMessageRecord, blocks: Array<{type:string;text?:string;concealed?:boolean}>) => {
+      const text = blocks.filter(block => block.type === "text").map(block => block.text ?? "").join("\\n");
+      return {
+        id: record.id,
+        mine: record.sender_id === profile?.id,
+        text: text || "Encrypted attachment",
+        time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        secret: blocks.some(block => block.concealed === true),
+      } as Message;
+    };
+    void loadDecryptedMlsHistory(conversationId, 100).then(result => {
+      if (cancelled) return;
+      setRealMessagesByChat(current => ({
+        ...current,
+        [activeChat.id]: result.messages.map(item => toUiMessage(item.record, item.content.blocks)),
+      }));
+      if (result.undecryptable.length) {
+        setRealMessageError(result.undecryptable.length + " message(s) could not be authenticated or decrypted on this device.");
+      }
+    }).catch(error => {
+      if (!cancelled) setRealMessageError(error instanceof Error ? error.message : "Could not load encrypted message history.");
+    }).finally(() => {
+      if (!cancelled) setRealMessageLoading(false);
+    });
+    const unsubscribe = subscribeToEncryptedMessages(conversationId, record => {
+      if (cancelled || record.expires_at && Date.parse(record.expires_at) <= Date.now()) return;
+      void decryptMlsMessage(record).then(content => {
+        if (cancelled) return;
+        const message = toUiMessage(record, content.blocks);
+        setRealMessagesByChat(current => {
+          const existing = current[activeChat.id] ?? [];
+          if (existing.some(item => item.id === message.id)) return current;
+          return { ...current, [activeChat.id]: [...existing, message] };
+        });
+      }).catch(() => {
+        if (!cancelled) setRealMessageError("A new message failed MLS authentication and was not displayed.");
+      });
+    }, status => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setRealMessageError("Realtime is disconnected. Pull to refresh to load encrypted history.");
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [activeChat?.id, activeChat?.conversationId, activeChat?.isReal, profile?.id]);
+
   const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
   const [accentPalette, setAccentPalette] = useState<AccentPalette>("violet");
   const systemColorScheme = useColorScheme();
@@ -675,24 +738,46 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
     }
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
     typingStopTimerRef.current = null;
     void presenceRef.current?.setTyping(false).catch(() => undefined);
     const value = draft.trim();
-    if (!value || !activeChat || activeChat.isReal) return;
+    if (!value || !activeChat) return;
+    if (activeChat.isReal) {
+      if (!activeChat.conversationId) return;
+      setRealMessageError("");
+      try {
+        const record = await sendMlsTextMessage(activeChat.conversationId, value, { concealed: draftSecret });
+        setRealMessagesByChat(current => ({
+          ...current,
+          [activeChat.id]: [
+            ...(current[activeChat.id] ?? []),
+            {
+              id: record.id,
+              mine: true,
+              text: value,
+              time: new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              secret: draftSecret,
+            },
+          ],
+        }));
+        setChats(current => current.map(chat => chat.id === activeChat.id
+          ? { ...chat, message: draftSecret ? "✦ A concealed message" : value, time: "now", secret: draftSecret }
+          : chat));
+        setDraft("");
+        setDraftSecret(false);
+      } catch (error) {
+        setRealMessageError(error instanceof Error ? error.message : "The encrypted message could not be sent.");
+      }
+      return;
+    }
     const sentAt = new Date().toISOString();
     setDemoMessagesByChat(current => ({
       ...current,
       [activeChat.id]: [
         ...(current[activeChat.id] ?? seedMessages),
-        {
-          id: sentAt,
-          mine: true,
-          text: value,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          secret: draftSecret,
-        },
+        { id: sentAt, mine: true, text: value, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), secret: draftSecret },
       ],
     }));
     setChats(current => current.map(chat => chat.id === activeChat.id
@@ -959,10 +1044,19 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
           <ScrollView contentContainerStyle={styles.messageList}>
             {activeChat.isReal ? (
-              <View style={{ alignItems: "center", paddingHorizontal: 24, paddingVertical: 28 }}>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: "800" }}>Conversation is ready</Text>
-                <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 7 }}>ChitChat will enable message sending here after device keys and end-to-end encryption are implemented. No plaintext message has been sent.</Text>
-              </View>
+              <>
+                {realMessageLoading ? <ActivityIndicator color={accentColor} style={{ marginTop: 24 }} /> : null}
+                {realMessageError ? <Text accessibilityRole="alert" style={{ color: "#B42318", fontSize: 11, textAlign: "center", paddingHorizontal: 18, paddingTop: 10 }}>{realMessageError}</Text> : null}
+                {activeRealMessages.map(message => (
+                  <View key={message.id} style={[styles.messageRow, message.mine ? styles.myRow : styles.theirRow]}>
+                    <View style={[styles.bubble, message.mine ? styles.myBubble : [styles.theirBubble, { backgroundColor: c.surface }]]}>
+                      {message.secret ? <SecretReveal text={message.text} autoReveal={autoReveal} dark={dark} accentColor={accentColor} /> : <Text selectable style={[styles.messageText, { color: message.mine ? "#FFFFFF" : c.text }]}>{message.text}</Text>}
+                      <Text style={[styles.messageTime, { color: message.mine ? "#E7E2FF" : c.muted }]}>{message.time} {message.mine ? "✓" : ""}</Text>
+                    </View>
+                  </View>
+                ))}
+                {!realMessageLoading && activeRealMessages.length === 0 && !realMessageError ? <Text style={{ color: c.muted, textAlign: "center", padding: 24, fontSize: 12 }}>No decrypted messages yet. Messages appear here only after MLS authentication succeeds.</Text> : null}
+              </>
             ) : (
               <>
                 <Text style={[styles.dayLabel, { color: c.muted }]}>TODAY</Text>
@@ -979,7 +1073,11 @@ function MainApp({ profile, onSignOut, onExitDemo, onProfileUpdated, openConvers
           </ScrollView>
           {activeChat.isReal ? (
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
-              <Text style={{ color: c.muted, fontSize: 12, textAlign: "center", flex: 1 }}>Secure messaging is not enabled yet.</Text>
+              <Pressable accessibilityRole="switch" accessibilityLabel="Conceal this message" accessibilityState={{ checked: draftSecret }} onPress={() => setDraftSecret(value => !value)} style={[styles.secretToggle, draftSecret && styles.secretToggleOn]}>
+                <Text style={[styles.secretToggleText, draftSecret && styles.secretToggleTextOn]}>✦</Text>
+              </Pressable>
+              <TextInput value={draft} onChangeText={handleDraftChange} placeholder={draftSecret ? "Write a concealed message..." : "Write an encrypted message..."} placeholderTextColor={c.muted} style={[styles.input, { backgroundColor: c.raised, color: c.text }]} onSubmitEditing={sendMessage} returnKeyType="send" />
+              <Pressable accessibilityRole="button" accessibilityLabel="Send encrypted message" disabled={!draft.trim()} onPress={() => void sendMessage()} style={[styles.sendButton, !draft.trim() && { opacity: 0.55 }]}><Text style={{ color: "#FFFFFF", fontSize: 18 }}>➤</Text></Pressable>
             </View>
           ) : (
             <View style={[styles.composer, { backgroundColor: c.surface, borderTopColor: c.line }]}>
