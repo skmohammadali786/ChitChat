@@ -79,6 +79,10 @@ export function DeviceManagementScreen({ onBack }: Props) {
       if (authError) throw authError;
       if (!data.user) throw new Error("Sign in to register this device.");
       const bundle = await chitchatCore.createDeviceIdentity(data.user.id);
+      const verifiedBundle = await chitchatCore.verifyDeviceBundle(bundle);
+      if (verifiedBundle.digits !== bundle.fingerprint || verifiedBundle.device_id !== bundle.device_id) {
+        throw new Error("The newly generated device signature did not verify. Nothing was registered.");
+      }
       await registerMyDevice(bundle);
       setNotice("This device has been registered. Compare its fingerprint with another device before trusting it.");
       await refresh();

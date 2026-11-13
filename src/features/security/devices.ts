@@ -44,6 +44,20 @@ export async function listMyDevices(): Promise<RegisteredDevice[]> {
 export async function registerMyDevice(bundle: DevicePublicBundle): Promise<RegisteredDevice> {
   const userId = await currentUserId();
   if (bundle.user_id !== userId) throw new Error("The device identity belongs to another account.");
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
+    throw new Error("Device registration is available only on Android and iOS.");
+  }
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bundle.device_id)
+    || !/^[A-Za-z0-9_-]{43}$/.test(bundle.identity_key_public)
+    || !/^[A-Za-z0-9_-]{43}$/.test(bundle.signed_prekey_public)
+    || !/^[A-Za-z0-9_-]{86}$/.test(bundle.signed_prekey_signature)
+    || !/^\d{10}$/.test(bundle.fingerprint)
+    || !Number.isInteger(bundle.key_version)
+    || bundle.key_version < 1
+  ) {
+    throw new Error("The native device identity bundle is malformed.");
+  }
   const { data, error } = await client()
     .from("devices")
     .insert({
