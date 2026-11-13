@@ -13,8 +13,8 @@ Legend:
 |---|---|---|
 | Email signup and login | PARTIAL | Real Supabase account flow, email confirmation, Android/iOS deep links, error states |
 | Password recovery | PARTIAL | Recovery link, deep-link callback, password update and device tests |
-| Username and profile | PARTIAL | Unique username, display name, bio, avatar, onboarding and editing |
-| Username discovery | PARTIAL | Exact lookup, opt-in discoverability, rate limits, block filtering |
+| Username and profile | PARTIAL | Unique username, display name, bio, onboarding and editing are wired; profile discovery privacy is editable in Settings and Edit Profile; encrypted avatar picker/decrypt/display and device tests remain |
+| Username discovery | PARTIAL | Exact lookup, opt-in discoverability from onboarding, Settings and Edit Profile, rate limits and block filtering; Android/iOS acceptance tests remain |
 | Optional phone discovery | NOT STARTED | Explicit permission, normalized phone matching, privacy controls |
 | Profile avatar | PARTIAL | Encrypted Rust output, private R2 upload, authorized download and update |
 
@@ -28,7 +28,7 @@ Legend:
 | Android to iOS and iOS to Android | NOT STARTED | Cross-platform protocol vectors and two-device tests |
 | Device identity and verification | NOT STARTED | Identity keys, signed prekeys, one-time keys, QR/SAS verification, rotation and revocation |
 | Multi-device and recovery | NOT STARTED | Secure device linking and recovery without a server decryption key |
-| Groups | PARTIAL | Group create/manage UI and RPCs exist; server RPCs now enforce discoverability and block checks even when called outside the UI. Invitations and E2EE key rotation remain |
+| Groups | PARTIAL | Create, rename, add/remove/leave, owner transfer, owner-only admin promotion/demotion and server role enforcement are wired; invitations and E2EE key rotation remain |
 | Replies and forwarding | NOT STARTED | Encrypted references and UI actions |
 | Copy restrictions | PARTIAL | Revealed secret text is non-selectable in the UI; sender-defined copy policy and platform-level capture limitations remain |
 | Reactions | PARTIAL | Unicode emoji table, RLS and client add/remove service exist; chat UI and realtime subscription remain |
