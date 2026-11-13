@@ -87,3 +87,10 @@ See [DEEP_AUDIT_2026-11-13.md](DEEP_AUDIT_2026-11-13.md) for the full feature-by
 - Signed-in users can enable app lock after authenticating with a configured device credential.
 - When enabled, the app locks whenever it leaves the foreground and requires device authentication before reopening conversations. The native OS flow can use biometrics or device PIN/passcode fallback.
 - This source integration has not yet been exercised in Android/iOS development builds. App-switching, cancellation, lockout, enrollment changes and notification-opening behavior must be tested on physical devices.
+
+
+## Conversation inbox controls
+
+- Added a Hidden inbox alongside Inbox and Archived.
+- Long-press conversation controls now support hide/unhide as a per-user preference, separate from archiving.
+- Account changes clear active chats, drafts in memory, and view state. Signed-in inboxes no longer retain demo sample conversations.
