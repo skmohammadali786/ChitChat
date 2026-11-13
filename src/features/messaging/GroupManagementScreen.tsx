@@ -185,7 +185,8 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
               const self = member.user_id === currentUserId;
               const name = member.display_name || member.username || "ChitChat member";
               const initials = name.split(" ").filter(Boolean).map(part => part[0]).join("").slice(0, 2).toUpperCase();
-              const canRemove = self || (canManage && member.member_role !== "owner");
+              const canLeave = self && (member.member_role !== "owner" || members.length === 1);
+              const canRemove = canLeave || (!self && canManage && member.member_role !== "owner");
               return (
                 <View key={member.user_id} style={styles.memberRow}>
                   <Avatar initials={initials || "CH"} color="#D8D1FF" size={42} />
@@ -202,6 +203,11 @@ export function GroupManagementScreen({ conversationId, initialTitle, onBack, on
                         <Text style={styles.transferText}>Make owner</Text>
                       </Pressable>
                     </>
+                  ) : null}
+                  {self && member.member_role === "owner" && members.length > 1 ? (
+                    <View style={styles.memberAction}>
+                      <Text style={styles.transferText}>Transfer first</Text>
+                    </View>
                   ) : null}
                   {canRemove ? (
                     <Pressable accessibilityRole="button" disabled={working} onPress={() => confirmRemove(member)} style={styles.memberAction}>

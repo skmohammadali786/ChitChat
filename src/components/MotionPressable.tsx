@@ -25,6 +25,7 @@ export function MotionPressable({
 }: PressableProps) {
   const progress = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [pressed, setPressed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -55,11 +56,13 @@ export function MotionPressable({
   }, [progress, reduceMotion]);
 
   const handlePressIn = useCallback((event: GestureResponderEvent) => {
+    setPressed(true);
     if (!disabled) animateTo(1);
     onPressIn?.(event);
   }, [animateTo, disabled, onPressIn]);
 
   const handlePressOut = useCallback((event: GestureResponderEvent) => {
+    setPressed(false);
     animateTo(0);
     onPressOut?.(event);
   }, [animateTo, onPressOut]);
@@ -71,7 +74,7 @@ export function MotionPressable({
     }],
   };
   const resolvedStyle = typeof style === "function"
-    ? style({ pressed: false } as PressableStateCallbackType)
+    ? style({ pressed } as PressableStateCallbackType)
     : style;
 
   return (
