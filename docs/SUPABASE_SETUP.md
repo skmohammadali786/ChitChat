@@ -53,5 +53,6 @@ The last migration intentionally removes authenticated client INSERT from `messa
 
 - `20261113033402_validate_message_report_submission.sql`
 - `20261113033634_serialize_report_rate_limits.sql`
+- `20261113034000_align_report_constraints_and_rpc_validation.sql`
 
-Report submission uses a transaction-scoped per-reporter advisory lock. This serializes both message and conversation reports so concurrent submissions cannot race past the shared five-per-hour limit.
+Report submission uses a transaction-scoped per-reporter advisory lock. This serializes both message and conversation reports so concurrent submissions cannot race past the shared five-per-hour limit. The details limit is 1,000 characters and report reason values are constrained consistently by the table and RPCs.
