@@ -144,9 +144,12 @@ impl ChitChatMlsBridge {
         let mut identity = self.device_identity.lock()
             .map_err(|_| ChitChatBridgeError::from_message("Device identity lock is unavailable."))?;
         *identity = None;
-        self.local_message_cache.lock()
-            .map_err(|_| ChitChatBridgeError::from_message("Local message cache lock is unavailable."))?
-            .clear();
+        let mut local_cache = self.local_message_cache.lock()
+            .map_err(|_| ChitChatBridgeError::from_message("Local message cache lock is unavailable."))?;
+        for value in local_cache.values_mut() {
+            value.zeroize();
+        }
+        local_cache.clear();
         clear_mls_storage_key()
             .map_err(|error| ChitChatBridgeError::from_message(error.to_string()))
     }
